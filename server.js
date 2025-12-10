@@ -7,6 +7,7 @@ const HEADLESS_MODE = false;
 const app = express();
 app.use(express.json());
 
+//cambio prueba
 async function basic(page, correo, contraseña, cliente, listaPrecio, producto, cantProducto, valorBonificacion, porcentajeIVA, productoLibre, descripcionLibre, precioLibre) {
   await page.goto("https://dev.fidel.com.ar/");
   await page.getByRole("link", { name: "Iniciar sesión" }).click();
