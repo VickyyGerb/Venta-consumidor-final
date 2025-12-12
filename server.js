@@ -7,8 +7,7 @@ const HEADLESS_MODE = false;
 const app = express();
 app.use(express.json());
 
-//cambio prueba
-async function basic(page, correo, contraseña, cliente, listaPrecio, producto, cantProducto, valorBonificacion, porcentajeIVA, productoLibre, descripcionLibre, precioLibre) {
+async function basic(page, correo, contraseña, cliente, listaPrecio, producto, cantProducto, valorBonificacion, nuevoProductoUpper, nombreNuevoProducto, categoriaNuevoProducto, codigoProveedor, codigoBarra, productoLibreUpper, descripcionProductoLibre, cantidadProductoLibre, precioProductoLibre, bonificacionProductoLibre) {
   await page.goto("https://dev.fidel.com.ar/");
   await page.getByRole("link", { name: "Iniciar sesión" }).click();
   await page.waitForTimeout(4000);
@@ -16,11 +15,11 @@ async function basic(page, correo, contraseña, cliente, listaPrecio, producto, 
   await page.getByRole("textbox", { name: "Contraseña" }).fill(contraseña);
   await page.getByRole("button", { name: "Ingresar" }).click();
   
-  await page.waitForTimeout(6000);
+  await page.waitForTimeout(10000);
   await page.goto("https://dev.fidel.com.ar/Sistema/ComprobanteRapido/Crear");
   await page.waitForTimeout(4000);
 
-  await page.getByRole("link", { name: "0000 - Consumidor Final - $ 20.000,00  " }).click();
+  await page.getByRole("link", { name: "0000 - Consumidor Final - $ 20.000,00  " }).click();
   await page.locator("#s2id_autogen1_search.select2-input").fill(cliente);
   await page.waitForTimeout(3000);
   
@@ -35,22 +34,17 @@ async function basic(page, correo, contraseña, cliente, listaPrecio, producto, 
   
   await page.waitForTimeout(5000);
 
-  // PRIMERO: PRODUCTO NORMAL (solo si se proporciona producto)
-  if (producto && producto.trim() !== "") {
-    console.log("Procesando PRODUCTO NORMAL");
-    const codigoProducto = producto.split(' ')[0];
-    
-    await page.getByRole("link", { name: "Seleccione... " }).click();
+  if (producto && producto.trim() !== "") {    
+    await page.getByRole("link", { name: "Seleccione... " }).click();
     await page.waitForTimeout(2000);
     
-    await page.locator('.select2-input:visible').last().fill(codigoProducto);
+    await page.locator('.select2-input:visible').last().fill(producto);
     await page.waitForTimeout(4000);
     
     await page.waitForSelector('.select2-results li', { timeout: 10000 });
     await page.locator('.select2-results li').first().click();
     await page.waitForTimeout(2000);
 
-    // Procesar cantidad para producto normal
     if (cantProducto && cantProducto !== "0") {
       await page.waitForTimeout(1000);
       
@@ -65,12 +59,12 @@ async function basic(page, correo, contraseña, cliente, listaPrecio, producto, 
       let cantidadInput = null;
       
       for (const selector of selectoresCantidad) {
-        const elementos = page.locator(selector);
+        const elementos = page.locator(selector).filter({ hasNot: page.locator(":disabled") });
         const count = await elementos.count();
         if (count > 0) {
           for (let i = 0; i < count; i++) {
             const elemento = elementos.nth(i);
-            if (await elemento.isVisible()) {
+            if (await elemento.isVisible() && !(await elemento.isDisabled())) {
               cantidadInput = elemento;
               break;
             }
@@ -83,285 +77,268 @@ async function basic(page, correo, contraseña, cliente, listaPrecio, producto, 
         await cantidadInput.click();
         await cantidadInput.fill('');
         await cantidadInput.fill(cantProducto);
-        await cantidadInput.press('Tab');
       }
     }
     
-    // IVA para producto normal
-    await page.waitForTimeout(1000);
-    await procesarIVA(page, porcentajeIVA);
+    const bonificacionSelectores = [
+      'input[id*="Bonificacion"]',
+      'input[name*="Bonificacion"]',
+      'input[placeholder*="Bonificacion"]',
+      'input[placeholder*="bonificacion"]',
+      'input.numeroConComa'
+    ];
     
-    await page.waitForTimeout(2000);
-  }
-
-  // DESPUÉS: PRODUCTO LIBRE (solo si se indica específicamente)
-  if (productoLibre && productoLibre.toUpperCase() === "SI") {
-    console.log("Procesando PRODUCTO LIBRE");
-    
-    // Agregar nueva línea para producto libre
-    await page.waitForTimeout(2000);
-    await agregarNuevaLinea(page);
-    
-    // Buscar y llenar el campo específico de producto libre
-    await page.waitForTimeout(1000);
-    const campoEncontrado = await buscarYLlenarProductoLibre(page, descripcionLibre);
-    
-    if (!campoEncontrado) {
-      // Si no encuentra el campo específico, usar método alternativo
-      await usarMetodoAlternativoProductoLibre(page, descripcionLibre);
-    }
-    
-    // Llenar cantidad para producto libre (generalmente 1)
-    await llenarCantidadProductoLibre(page);
-    
-    // Llenar precio libre si se proporciona
-    if (precioLibre && precioLibre !== "0") {
-      await llenarPrecioLibre(page, precioLibre);
-    }
-    
-    // IVA para producto libre
-    await page.waitForTimeout(1000);
-    await procesarIVA(page, porcentajeIVA);
-    
-    await page.waitForTimeout(2000);
-  }
-
-  // BONIFICACIÓN (solo si hay producto normal y se proporciona bonificación)
-  if (producto && producto.trim() !== "" && valorBonificacion && valorBonificacion !== "0") {
-    console.log("Aplicando BONIFICACIÓN a producto normal");
-    await aplicarBonificacion(page, valorBonificacion);
-  }
-
-  await page.waitForTimeout(2000);
-}
-
-// FUNCIONES AUXILIARES
-
-async function agregarNuevaLinea(page) {
-  // Buscar botón para agregar nueva línea
-  const botonesAgregar = [
-    page.getByRole('button', { name: /\+/i }),
-    page.getByRole('button', { name: /Agregar/i }),
-    page.getByRole('button', { name: /Nuevo/i }),
-    page.locator('button:has-text("+")'),
-    page.locator('a:has-text("+")'),
-    page.locator('[title*="Agregar"]'),
-    page.locator('[title*="agregar"]')
-  ];
-  
-  for (const boton of botonesAgregar) {
-    if (await boton.count() > 0 && await boton.isVisible()) {
-      await boton.click();
-      await page.waitForTimeout(2000);
-      console.log("Nueva línea agregada para producto libre");
-      return true;
-    }
-  }
-  
-  // Si no encuentra botón, hacer click en el último selector de producto
-  const ultimoSelector = page.getByRole("link", { name: "Seleccione... " }).last();
-  if (await ultimoSelector.count() > 0) {
-    await ultimoSelector.click();
-    await page.waitForTimeout(2000);
-    console.log("Click en último selector para nueva línea");
-    return true;
-  }
-  
-  console.log("No se pudo agregar nueva línea");
-  return false;
-}
-
-async function buscarYLlenarProductoLibre(page, descripcionLibre) {
-  // Buscar específicamente el campo input#ListaProductoLibreVenta
-  const campoEspecifico = page.locator('input#ListaProductoLibreVenta');
-  
-  if (await campoEspecifico.count() > 0) {
-    console.log("Encontrado input#ListaProductoLibreVenta");
-    await campoEspecifico.click();
-    await campoEspecifico.fill('');
-    await campoEspecifico.fill(descripcionLibre || "Producto Libre");
-    await page.waitForTimeout(1000);
-    return true;
-  }
-  
-  // También buscar por otros selectores relacionados
-  const otrosSelectores = [
-    'input[name*="ProductoLibre"]',
-    'input[name*="LibreVenta"]',
-    'input[placeholder*="libre"]',
-    'input[placeholder*="Libre"]'
-  ];
-  
-  for (const selector of otrosSelectores) {
-    const elemento = page.locator(selector);
-    if (await elemento.count() > 0) {
-      console.log(`Encontrado campo con selector: ${selector}`);
-      await elemento.click();
-      await elemento.fill('');
-      await elemento.fill(descripcionLibre || "Producto Libre");
-      await page.waitForTimeout(1000);
-      return true;
-    }
-  }
-  
-  return false;
-}
-
-async function usarMetodoAlternativoProductoLibre(page, descripcionLibre) {
-  console.log("Usando método alternativo para producto libre");
-  
-  // Hacer click en el selector de producto
-  await page.getByRole("link", { name: "Seleccione... " }).last().click();
-  await page.waitForTimeout(2000);
-  
-  // Buscar y escribir "LIBRE"
-  const select2Inputs = page.locator('.select2-input:visible');
-  const count = await select2Inputs.count();
-  
-  if (count > 0) {
-    await select2Inputs.last().fill("LIBRE");
-    await page.waitForTimeout(3000);
-    
-    // Seleccionar opción "LIBRE"
-    const libreOption = page.locator('.select2-results li').filter({ hasText: /libre/i });
-    if (await libreOption.count() > 0) {
-      await libreOption.first().click();
-      await page.waitForTimeout(2000);
+    for (const selector of bonificacionSelectores) {
+      const elementos = page.locator(selector).filter({ hasNot: page.locator(":disabled") });
+      const count = await elementos.count();
       
-      // Llenar descripción si existe campo
-      if (descripcionLibre) {
-        const descripcionInput = page.locator('input[placeholder*="descripcion" i], input[placeholder*="Descripción" i]').last();
-        if (await descripcionInput.count() > 0) {
-          await descripcionInput.fill(descripcionLibre);
+      if (count > 0) {
+        for (let i = 0; i < count; i++) {
+          const elemento = elementos.nth(i);
+          const isVisible = await elemento.isVisible();
+          const isDisabled = await elemento.isDisabled();
+          
+          if (isVisible && !isDisabled) {
+            await elemento.click();
+            await elemento.fill('');
+            await elemento.fill(valorBonificacion);
+            break;
+          }
         }
       }
     }
-  }
-}
-
-async function llenarCantidadProductoLibre(page) {
-  // Buscar el ÚLTIMO campo de cantidad (que sería el del producto libre)
-  const cantidadInputs = page.locator('input[placeholder*="Cant"], input[placeholder*="cant"], input[id*="Cantidad"]');
-  const cantidadCount = await cantidadInputs.count();
-  
-  if (cantidadCount > 0) {
-    // Tomar el último campo de cantidad visible
-    for (let i = cantidadCount - 1; i >= 0; i--) {
-      const cantidadInput = cantidadInputs.nth(i);
-      if (await cantidadInput.isVisible()) {
-        await cantidadInput.click();
-        await cantidadInput.fill('');
-        await cantidadInput.fill("1"); // Producto libre generalmente es cantidad 1
-        await cantidadInput.press('Tab');
-        console.log("Cantidad 1 asignada a producto libre");
-        return;
-      }
-    }
-  }
-}
-
-async function llenarPrecioLibre(page, precioLibre) {
-  // Buscar el ÚLTIMO campo de precio (que sería el del producto libre)
-  const precioInputs = page.locator('input[placeholder*="Precio"], input[name*="Precio"], input.numeroConComa');
-  const precioCount = await precioInputs.count();
-  
-  if (precioCount > 0) {
-    // Tomar el último campo de precio visible
-    for (let i = precioCount - 1; i >= 0; i--) {
-      const precioInput = precioInputs.nth(i);
-      if (await precioInput.isVisible()) {
-        await precioInput.click();
-        await precioInput.fill('');
-        await precioInput.fill(precioLibre);
-        console.log(`Precio ${precioLibre} asignado a producto libre`);
-        return;
-      }
-    }
-  }
-}
-
-async function procesarIVA(page, porcentajeIVA) {
-  const allHiddenSelects = await page.$$('select[style*="display: none"]');
-  
-  for (const select of allHiddenSelects) {
-    const selectId = await select.getAttribute('id');
-    const selectName = await select.getAttribute('name');
     
-    if ((selectId && selectId.includes('TipoIVA')) || (selectName && selectName.includes('TipoIVA'))) {
-      const chosenDiv = await page.$(`div[id="${selectId}_chosen"]`);
+    await page.waitForTimeout(2000);
+
+    if (nuevoProductoUpper === "SI") {
+      await page.waitForTimeout(3000);
       
-      if (chosenDiv) {
-        const chosenSingle = await chosenDiv.$('a.chosen-single');
-        
-        if (chosenSingle) {
-          await chosenSingle.click();
-          await page.waitForTimeout(1000);
-          
-          const inputBusqueda = await page.locator('[data-gtm-form-interact-field-id="0"]');
-          
-          if (await inputBusqueda.isVisible()) {
-            await inputBusqueda.fill(porcentajeIVA);
-            await page.waitForTimeout(800);
-            
-            const primeraOpcion = await page.locator('.active-result').first();
-            if (await primeraOpcion.isVisible()) {
-              await primeraOpcion.click();
-            } else {
-              await page.keyboard.press('Enter');
-            }
-          } else {
-            await page.keyboard.type(porcentajeIVA);
-            await page.waitForTimeout(500);
-            await page.keyboard.press('Enter');
+      await page.evaluate(() => {
+        const links = document.querySelectorAll('a');
+        for (let link of links) {
+          if (link.textContent && link.textContent.includes('Crear Producto/Servicio')) {
+            link.click();
+            return true;
           }
-          console.log(`IVA ${porcentajeIVA}% aplicado`);
+        }
+        return false;
+      });
+      
+      await page.waitForTimeout(5000);
+      
+      await page.waitForLoadState('networkidle');
+      
+      await page.evaluate((nombre) => {
+        const input = document.querySelector('input[id="Nombre"]');
+        if (input) {
+          input.focus();
+          input.value = nombre;
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+          input.dispatchEvent(new Event('change', { bubbles: true }));
+          return true;
+        }
+        return false;
+      }, nombreNuevoProducto);
+      
+      await page.waitForTimeout(1000);
+      
+      await page.evaluate((codigoProveedor) => {
+        const input = document.querySelector('input[id="CodigoProveedor"]');
+        if (input) {
+          input.focus();
+          input.value = codigoProveedor;
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+          return true;
+        }
+        return false;
+      }, codigoProveedor);
+      
+      await page.waitForTimeout(1000);
+      
+      await page.evaluate((codigoBarra) => {
+        const input = document.querySelector('input[id="CodigoDeBarra"]');
+        if (input) {
+          input.focus();
+          input.value = codigoBarra;
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+          return true;
+        }
+        return false;
+      }, codigoBarra);
+      
+      await page.waitForTimeout(1000);
+      
+      await page.evaluate(() => {
+        const span = document.querySelector('#CategoriaId_chosen .chosen-single span');
+        if (span) {
+          span.click();
+          return true;
+        }
+        return false;
+      });
+      
+      await page.waitForTimeout(500);
+      
+      await page.evaluate((categoria) => {
+        const input = document.querySelector('.chosen-container-active .chosen-search input');
+        if (input) {
+          input.focus();
+          input.value = categoria;
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+          return true;
+        }
+        return false;
+      }, categoriaNuevoProducto);
+      
+      await page.waitForTimeout(1500);
+      
+      await page.evaluate(() => {
+        const firstOption = document.querySelector('.chosen-container-active .chosen-results li');
+        if (firstOption) {
+          firstOption.click();
+          return true;
+        }
+        return false;
+      });
+    }
+    
+    if (productoLibreUpper === "SI") {
+      await page.waitForTimeout(3000);
+      
+      try {
+        await page.locator('text="Productos/Servicios Libres"').first().click();
+        await page.waitForTimeout(1000);
+      } catch (error) {
+        console.log('No se pudo hacer clic en Productos/Servicios Libres');
+      }
+      
+      await page.waitForTimeout(2000);
+      
+      const tableRows = await page.locator('table tr').all();
+      let productoTipoSelect = null;
+      
+      for (let row of tableRows) {
+        const rowText = await row.textContent();
+        if (rowText && rowText.includes('Productos/Servicios Libres')) {
+          const selectElement = await row.locator('select').first();
+          if (await selectElement.count() > 0) {
+            productoTipoSelect = selectElement;
+            break;
+          }
+        }
+      }
+      
+      if (productoTipoSelect) {
+        await productoTipoSelect.selectOption({ label: 'Productos' });
+        await page.waitForTimeout(1000);
+      }
+      
+      const libreRows = await page.locator('table tr').all();
+      let libreRow = null;
+      
+      for (let row of libreRows) {
+        const rowText = await row.textContent();
+        if (rowText && (rowText.includes('Descripción') || rowText.includes('Tipo') || rowText.includes('Cant.'))) {
+          libreRow = row;
           break;
         }
       }
-    }
-  }
-}
-
-async function aplicarBonificacion(page, valorBonificacion) {
-  const bonificacionSelectores = [
-    'input[id*="Bonificacion"]',
-    'input[name*="Bonificacion"]',
-    'input[placeholder*="Bonificacion"]',
-    'input[placeholder*="bonificacion"]',
-    'input.numeroConComa'
-  ];
-  
-  for (const selector of bonificacionSelectores) {
-    const elementos = page.locator(selector);
-    const count = await elementos.count();
-    
-    if (count > 0) {
-      // Tomar el PRIMER campo de bonificación (para producto normal)
-      for (let i = 0; i < count; i++) {
-        const elemento = elementos.nth(i);
-        const isVisible = await elemento.isVisible();
+      
+      if (libreRow) {
+        const inputs = await libreRow.locator('input').all();
         
-        if (isVisible) {
-          await elemento.click();
-          await elemento.fill('');
-          await elemento.fill(valorBonificacion);
-          await elemento.press('Tab');
-          console.log(`Bonificación ${valorBonificacion} aplicada`);
-          return true;
+        if (inputs.length >= 4) {
+          await inputs[0].fill(descripcionProductoLibre);
+          await page.waitForTimeout(500);
+          
+          await inputs[1].fill(cantidadProductoLibre);
+          await page.waitForTimeout(500);
+          
+          await inputs[2].fill(precioProductoLibre);
+          await page.waitForTimeout(500);
+          
+          await inputs[3].fill(bonificacionProductoLibre);
         }
       }
+      
+      await page.waitForTimeout(2000);
     }
   }
-  
-  console.log("No se encontró campo de bonificación");
-  return false;
 }
 
 app.post("/login-basic", async (req, res) => {
-  const { correo, contraseña, cliente, listaPrecio, producto, cantProducto, valorBonificacion, porcentajeIVA, productoLibre, descripcionLibre, precioLibre } = req.body;
+  const { correo, contraseña, cliente, listaPrecio, producto, cantProducto, 
+          valorBonificacion, porcentajeIVA, nuevoProducto, nombreNuevoProducto, 
+          categoriaNuevoProducto, codigoProveedor, codigoBarra, productoLibre, 
+          descripcionProductoLibre, cantidadProductoLibre, precioProductoLibre, 
+          bonificacionProductoLibre } = req.body;
 
-  if (!correo || !contraseña || !cliente || !listaPrecio || !porcentajeIVA) {
-    return res.status(400).json({ ok: false, error: "Faltan datos básicos." });
+  if (!correo || !contraseña || !producto || 
+      !cantProducto || !porcentajeIVA || !nuevoProducto) {
+    return res.status(400).json({ 
+      ok: false, 
+      error: "Faltan datos básicos." 
+    });
+  }
+
+  const nuevoProductoUpper = nuevoProducto.trim().toUpperCase();
+
+  if (nuevoProductoUpper === "SI") {
+    if (!nombreNuevoProducto) {
+      return res.status(400).json({ 
+        ok: false, 
+        error: "Cuando nuevoProducto es 'SI', el campo nombreNuevoProducto es obligatorio." 
+      });
+    }
+    
+    if (!categoriaNuevoProducto) {
+      return res.status(400).json({ 
+        ok: false, 
+        error: "Cuando nuevoProducto es 'SI', el campo categoriaNuevoProducto es obligatorio." 
+      });
+    }
+  }
+  if (nuevoProductoUpper !== "SI" && nuevoProductoUpper !== "NO") {
+    return res.status(400).json({ 
+      ok: false, 
+      error: "El campo nuevoProducto debe ser 'SI' o 'NO'." 
+    });
+  }
+
+  const productoLibreUpper = productoLibre.trim().toUpperCase();
+
+  if (productoLibreUpper === "SI") {
+    if (!descripcionProductoLibre) {
+      return res.status(400).json({
+        ok: false,
+        error: "Cuando productoLibre es 'SI', el campo descripcionProductoLibre es obligatorio."
+      });
+    }
+    if (!cantidadProductoLibre) {
+      return res.status(400).json({
+        ok: false,  
+        error: "Cuando productoLibre es 'SI', el campo cantidadProductoLibre es obligatorio."
+      });
+    }
+    if (!precioProductoLibre) {
+      return res.status(400).json({
+        ok: false,
+        error: "Cuando productoLibre es 'SI', el campo precioProductoLibre es obligatorio."
+      });
+    }
+    if (!bonificacionProductoLibre) {
+      return res.status(400).json({
+        ok: false,
+        error: "Cuando productoLibre es 'SI', el campo bonificacionProductoLibre es obligatorio."
+      });
+    }
+  }
+
+  if (productoLibreUpper !== "SI" && productoLibreUpper !== "NO") {
+    return res.status(400).json({ 
+      ok: false, 
+      error: "El campo productoLibre debe ser 'SI' o 'NO'." 
+    });
   }
 
   const browser = await chromium.launch({ 
@@ -376,13 +353,20 @@ app.post("/login-basic", async (req, res) => {
   const page = await context.newPage();
 
   try {
-    await basic(page, correo, contraseña, cliente, listaPrecio, producto, cantProducto, valorBonificacion, porcentajeIVA, productoLibre, descripcionLibre, precioLibre);
+    await basic(page, correo, contraseña, cliente, listaPrecio, producto, 
+                cantProducto, valorBonificacion, nuevoProductoUpper, 
+                nombreNuevoProducto, categoriaNuevoProducto, codigoProveedor || '', 
+                codigoBarra || '', productoLibreUpper, descripcionProductoLibre, 
+                cantidadProductoLibre, precioProductoLibre, bonificacionProductoLibre);
 
     res.json({ ok: true, message: "COMPLETADO" });
 
   } catch (error) {
     console.error("Error:", error);
-    res.status(500).json({ ok: false, error: error.message });
+    res.status(500).json({ 
+      ok: false, 
+      error: error.message || "Error interno del servidor" 
+    });
 
   } finally {
     await browser.close();
