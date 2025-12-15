@@ -7,7 +7,7 @@ const HEADLESS_MODE = false;
 const app = express();
 app.use(express.json());
 
-async function basic(page, correo, contraseña, cliente, listaPrecio, producto, cantProducto, valorBonificacion, nuevoProductoUpper, nombreNuevoProducto, categoriaNuevoProducto, codigoProveedor, codigoBarra, productoLibreUpper, descripcionProductoLibre, cantidadProductoLibre, precioProductoLibre, bonificacionProductoLibre) {
+async function basic(page, correo, contraseña, cliente, listaPrecio, producto, cantProducto, valorBonificacion, nuevoProductoUpper, nombreNuevoProducto, tipoNuevoProducto, ivaNuevoProducto, contableVenta, contableCompra, categoriaNuevoProducto, codigoProveedor, codigoBarra, productoLibreUpper, descripcionProductoLibre, cantidadProductoLibre, precioProductoLibre, bonificacionProductoLibre) {
   await page.goto("https://dev.fidel.com.ar/");
   await page.getByRole("link", { name: "Iniciar sesión" }).click();
   await page.waitForTimeout(4000);
@@ -19,18 +19,29 @@ async function basic(page, correo, contraseña, cliente, listaPrecio, producto, 
   await page.goto("https://dev.fidel.com.ar/Sistema/ComprobanteRapido/Crear");
   await page.waitForTimeout(4000);
 
-  await page.getByRole("link", { name: "0000 - Consumidor Final - $ 20.000,00  " }).click();
-  await page.locator("#s2id_autogen1_search.select2-input").fill(cliente);
-  await page.waitForTimeout(3000);
-  
-  await page.click('.select2-result-label');
-  await page.waitForTimeout(3000);
+  if (cliente && cliente.trim() !== "" && cliente.trim() !== "0000") {
+    await page.getByRole("link", { name: "0000 - Consumidor Final - $ 20.000,00  " }).click();
+    await page.locator("#s2id_autogen1_search.select2-input").fill(cliente);
+    await page.waitForTimeout(3000);
+    
+    await page.click('.select2-result-label');
+    await page.waitForTimeout(3000);
+  } else {
+    console.log("Cliente es '0000' o vacío, no se modifica");
+    await page.waitForTimeout(3000);
+  }
 
-  await page.locator("#ListaDePreciosVentaId_chosen").click();
-  await page.waitForTimeout(1000);
-  await page.keyboard.type(listaPrecio);
-  await page.waitForTimeout(1000);
-  await page.keyboard.press("Enter");
+  if (listaPrecio && listaPrecio.trim() !== "" && listaPrecio.trim().toLowerCase() !== "general") {
+    await page.locator("#ListaDePreciosVentaId_chosen").click();
+    await page.waitForTimeout(1000);
+    await page.keyboard.type(listaPrecio);
+    await page.waitForTimeout(1000);
+    await page.keyboard.press("Enter");
+    await page.waitForTimeout(2000);
+  } else {
+    console.log("Lista de precios es 'General' o vacía, no se modifica");
+    await page.waitForTimeout(2000);
+  }
   
   await page.waitForTimeout(5000);
 
@@ -102,105 +113,60 @@ async function basic(page, correo, contraseña, cliente, listaPrecio, producto, 
             await elemento.click();
             await elemento.fill('');
             await elemento.fill(valorBonificacion);
+            await page.keyboard.press('Tab');
             break;
           }
+         await page.keyboard.press('Tab');
         }
       }
     }
     
-    await page.waitForTimeout(2000);
 
     if (nuevoProductoUpper === "SI") {
       await page.waitForTimeout(3000);
-      
-      await page.evaluate(() => {
-        const links = document.querySelectorAll('a');
-        for (let link of links) {
-          if (link.textContent && link.textContent.includes('Crear Producto/Servicio')) {
-            link.click();
-            return true;
-          }
-        }
-        return false;
-      });
-      
-      await page.waitForTimeout(5000);
-      
-      await page.waitForLoadState('networkidle');
-      
-      await page.evaluate((nombre) => {
-        const input = document.querySelector('input[id="Nombre"]');
-        if (input) {
-          input.focus();
-          input.value = nombre;
-          input.dispatchEvent(new Event('input', { bubbles: true }));
-          input.dispatchEvent(new Event('change', { bubbles: true }));
-          return true;
-        }
-        return false;
-      }, nombreNuevoProducto);
-      
+
+      await page.getByRole('link', { name: 'Crear Producto/Servicio' }).click();
+      await page.waitForTimeout(2000);
+
+      await page.waitForSelector('#form-productoModal', { state: 'visible', timeout: 5000 });
+
+      await page.locator('#form-productoModal #Nombre').click();
+      await page.locator('#form-productoModal #Nombre').fill(nombreNuevoProducto);
+
       await page.waitForTimeout(1000);
-      
-      await page.evaluate((codigoProveedor) => {
-        const input = document.querySelector('input[id="CodigoProveedor"]');
-        if (input) {
-          input.focus();
-          input.value = codigoProveedor;
-          input.dispatchEvent(new Event('input', { bubbles: true }));
-          return true;
-        }
-        return false;
-      }, codigoProveedor);
-      
-      await page.waitForTimeout(1000);
-      
-      await page.evaluate((codigoBarra) => {
-        const input = document.querySelector('input[id="CodigoDeBarra"]');
-        if (input) {
-          input.focus();
-          input.value = codigoBarra;
-          input.dispatchEvent(new Event('input', { bubbles: true }));
-          return true;
-        }
-        return false;
-      }, codigoBarra);
-      
-      await page.waitForTimeout(1000);
-      
-      await page.evaluate(() => {
-        const span = document.querySelector('#CategoriaId_chosen .chosen-single span');
-        if (span) {
-          span.click();
-          return true;
-        }
-        return false;
-      });
-      
+
+      if (codigoProveedor && codigoProveedor.trim() !== "") {
+      await page.locator('#form-productoModal #CodigoProveedor').fill(codigoProveedor);
       await page.waitForTimeout(500);
-      
-      await page.evaluate((categoria) => {
-        const input = document.querySelector('.chosen-container-active .chosen-search input');
-        if (input) {
-          input.focus();
-          input.value = categoria;
-          input.dispatchEvent(new Event('input', { bubbles: true }));
-          return true;
-        }
-        return false;
-      }, categoriaNuevoProducto);
-      
-      await page.waitForTimeout(1500);
-      
-      await page.evaluate(() => {
-        const firstOption = document.querySelector('.chosen-container-active .chosen-results li');
-        if (firstOption) {
-          firstOption.click();
-          return true;
-        }
-        return false;
-      });
-    }
+      }
+
+      if (codigoBarra && codigoBarra.trim() !== "") {
+      await page.locator('#form-productoModal #CodigoDeBarra').fill(codigoBarra);
+      await page.waitForTimeout(500);
+      }
+
+      await page.locator('#ConceptoId_chosen a').filter({ hasText: 'Productos' }).click();
+      await page.waitForTimeout(500);
+
+      await page.locator('#ConceptoId_chosen > .chosen-drop > .chosen-search > input').fill(tipoNuevoProducto);
+      await page.waitForTimeout(1000);
+      await page.keyboard.press('Enter');
+
+      await page.locator('#AlicuotaId_chosen a').filter({ hasText: /^Seleccione...$/ }).click();
+      await page.waitForTimeout(500);
+
+      await page.locator('#AlicuotaId_chosen > .chosen-drop > .chosen-search > input').fill(ivaNuevoProducto);
+      await page.waitForTimeout(1000);
+      await page.keyboard.press('Enter');
+
+      await page.locator('#divSubCategorias a').filter({ hasText: /^Seleccione...$/ }).click();
+      await page.waitForTimeout(500);
+
+      await page.locator('#divSubCategorias .chosen-search input').fill(categoriaNuevoProducto);
+      await page.keyboard.press('Enter');
+      await page.waitForTimeout(1000);
+
+      }
     
     if (productoLibreUpper === "SI") {
       await page.waitForTimeout(3000);
@@ -263,25 +229,94 @@ async function basic(page, correo, contraseña, cliente, listaPrecio, producto, 
       
       await page.waitForTimeout(2000);
     }
+
+    await page.waitForTimeout(5000);
+    
+    let precioTotal = await page.evaluate(() => {
+      const totalElement = document.querySelector('input#TotalTemp.numeroConComa');
+      if (totalElement) {
+        return totalElement.value;
+      }
+      return null;
+    });
+    
+    if (precioTotal) {
+      console.log(`PRECIO TOTAL DE LA FACTURA: $${precioTotal}`);
+    } else {
+      console.log('No se encontró el precio total');
+      
+      precioTotal = await page.evaluate(() => {
+        const selectors = [
+          'input#TotalTemp',
+          'input.numeroConComa[id*="Total"]',
+          'input[name*="Total"]',
+          'input[placeholder*="Total"]',
+          '.total-final',
+          '.importe-total'
+        ];
+        
+        for (const selector of selectors) {
+          const element = document.querySelector(selector);
+          if (element && element.value) {
+            return element.value;
+          }
+        }
+        return null;
+      });
+      
+      if (precioTotal) {
+        console.log(`PRECIO TOTAL ENCONTRADO (selector alternativo): $${precioTotal}`);
+      }
+    }
+    
+    const resultado = {
+      precioTotal: precioTotal || "No encontrado"
+    };
+
+    await page.waitForTimeout(5000);
+    
+    try {
+      await page.locator('a.btn.btn-xs.btn-success:has-text("Facturar")').click();
+    } catch (error) {
+      try {
+        await page.locator('a:has-text("Facturar")').click();
+      } catch (error2) {
+        await page.evaluate(() => {
+          const elements = document.querySelectorAll('a.btn.btn-xs.btn-success');
+          for (let element of elements) {
+            if (element.textContent && element.textContent.includes('Facturar')) {
+              element.click();
+              return true;
+            }
+          }
+          return false;
+        });
+      }
+    }
+    
+    await page.pause();
+    
+    return resultado;
   }
+  
+  return { precioTotal: "Sin producto" };
 }
 
 app.post("/login-basic", async (req, res) => {
   const { correo, contraseña, cliente, listaPrecio, producto, cantProducto, 
           valorBonificacion, porcentajeIVA, nuevoProducto, nombreNuevoProducto, 
-          categoriaNuevoProducto, codigoProveedor, codigoBarra, productoLibre, 
+          categoriaNuevoProducto, tipoNuevoProducto, ivaNuevoProducto, contableVenta, contableCompra, codigoProveedor, codigoBarra, productoLibre, 
           descripcionProductoLibre, cantidadProductoLibre, precioProductoLibre, 
           bonificacionProductoLibre } = req.body;
 
-  if (!correo || !contraseña || !producto || 
-      !cantProducto || !porcentajeIVA || !nuevoProducto) {
+  if (!correo || !contraseña) {
     return res.status(400).json({ 
       ok: false, 
       error: "Faltan datos básicos." 
     });
   }
 
-  const nuevoProductoUpper = nuevoProducto.trim().toUpperCase();
+  const nuevoProductoUpper = nuevoProducto ? nuevoProducto.trim().toUpperCase() : "NO";
 
   if (nuevoProductoUpper === "SI") {
     if (!nombreNuevoProducto) {
@@ -297,6 +332,24 @@ app.post("/login-basic", async (req, res) => {
         error: "Cuando nuevoProducto es 'SI', el campo categoriaNuevoProducto es obligatorio." 
       });
     }
+    if (!ivaNuevoProducto) {
+      return res.status(400).json({ 
+        ok: false, 
+        error: "Cuando nuevoProducto es 'SI', el campo ivaNuevoProducto es obligatorio." 
+      });
+    }
+    if (!contableCompra) {
+      return res.status(400).json({ 
+        ok: false, 
+        error: "Cuando nuevoProducto es 'SI', el campo contableCompra es obligatorio." 
+      });
+    }
+    if (!contableVenta) {
+      return res.status(400).json({ 
+        ok: false, 
+        error: "Cuando nuevoProducto es 'SI', el campo contableVenta es obligatorio." 
+      });
+    }
   }
   if (nuevoProductoUpper !== "SI" && nuevoProductoUpper !== "NO") {
     return res.status(400).json({ 
@@ -305,7 +358,7 @@ app.post("/login-basic", async (req, res) => {
     });
   }
 
-  const productoLibreUpper = productoLibre.trim().toUpperCase();
+  const productoLibreUpper = productoLibre ? productoLibre.trim().toUpperCase() : "NO";
 
   if (productoLibreUpper === "SI") {
     if (!descripcionProductoLibre) {
@@ -351,15 +404,22 @@ app.post("/login-basic", async (req, res) => {
   });
   
   const page = await context.newPage();
+  
+  page.setDefaultTimeout(120000);
+  page.setDefaultNavigationTimeout(120000);
 
   try {
-    await basic(page, correo, contraseña, cliente, listaPrecio, producto, 
-                cantProducto, valorBonificacion, nuevoProductoUpper, 
-                nombreNuevoProducto, categoriaNuevoProducto, codigoProveedor || '', 
-                codigoBarra || '', productoLibreUpper, descripcionProductoLibre, 
-                cantidadProductoLibre, precioProductoLibre, bonificacionProductoLibre);
+    const resultado = await basic(page, correo, contraseña, cliente || "", listaPrecio || "", producto || "", 
+                cantProducto || "", valorBonificacion || "", nuevoProductoUpper, 
+                nombreNuevoProducto || "", categoriaNuevoProducto || "", codigoProveedor || '', 
+                codigoBarra || '', tipoNuevoProducto || "", ivaNuevoProducto || "", contableVenta || "", contableCompra || "", productoLibreUpper, descripcionProductoLibre || "", 
+                cantidadProductoLibre || "", precioProductoLibre || "", bonificacionProductoLibre || "");
 
-    res.json({ ok: true, message: "COMPLETADO" });
+    res.json({ 
+      ok: true, 
+      message: "COMPLETADO",
+      precioTotal: resultado.precioTotal
+    });
 
   } catch (error) {
     console.error("Error:", error);
