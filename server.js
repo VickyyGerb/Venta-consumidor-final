@@ -7,7 +7,7 @@ const HEADLESS_MODE = false;
 const app = express();
 app.use(express.json());
 
-async function basic(page, correo, contraseña, cliente, listaPrecio, producto, cantProducto, valorBonificacion, nuevoProductoUpper, nombreNuevoProducto, tipoNuevoProducto, ivaNuevoProducto, contableVenta, contableCompra, categoriaNuevoProducto, codigoProveedor, codigoBarra, productoLibreUpper, descripcionProductoLibre, cantidadProductoLibre, precioProductoLibre, bonificacionProductoLibre, productoNormalUpper, precioNuevoProducto) {
+async function basic(page, correo, contraseña, cliente, listaPrecio, producto, cantProducto, valorBonificacion, nuevoProductoUpper, nombreNuevoProducto, tipoNuevoProducto, ivaNuevoProducto, contableVenta, contableCompra, categoriaNuevoProducto, codigoProveedor, codigoBarra, productoLibreUpper, descripcionProductoLibre, cantidadProductoLibre, precioProductoLibre, bonificacionProductoLibre, productoNormalUpper, precioNuevoProducto, cantProductoNuevo, tipoProductoLibre, bonificacionProductoNuevo) {
   await page.goto("https://dev.fidel.com.ar/");
   await page.getByRole("link", { name: "Iniciar sesión" }).click();
   await page.waitForTimeout(4000);
@@ -47,12 +47,91 @@ async function basic(page, correo, contraseña, cliente, listaPrecio, producto, 
 
   let codigoLeido = "";
 
+  // PRODUCTO NORMAL
+  if (productoNormalUpper === "SI" && producto && producto.trim() !== "") {    
+    await page.getByRole("link", { name: "Seleccione... " }).click();
+    await page.waitForTimeout(2000);
+    
+    await page.locator('.select2-input:visible').last().fill(producto);
+    await page.waitForTimeout(4000);
+    
+    await page.waitForSelector('.select2-results li', { timeout: 10000 });
+    await page.locator('.select2-results li').first().click();
+    await page.waitForTimeout(2000);
+
+    if (cantProducto && cantProducto !== "0") {
+      await page.waitForTimeout(1000);
+      
+      const selectoresCantidad = [
+        'input[placeholder*="Cant"]',
+        'input[placeholder*="cant"]',
+        'input[id*="Cantidad"]',
+        'td input.numeroConComa',
+        'input.numeroConComa'
+      ];
+      
+      let cantidadInput = null;
+      
+      for (const selector of selectoresCantidad) {
+        const elementos = page.locator(selector).filter({ hasNot: page.locator(":disabled") });
+        const count = await elementos.count();
+        if (count > 0) {
+          for (let i = 0; i < count; i++) {
+            const elemento = elementos.nth(i);
+            if (await elemento.isVisible() && !(await elemento.isDisabled())) {
+              cantidadInput = elemento;
+              break;
+            }
+          }
+          if (cantidadInput) break;
+        }
+      }
+      
+      if (cantidadInput) {
+        await cantidadInput.click();
+        await cantidadInput.fill('');
+        await cantidadInput.fill(cantProducto);
+      }
+    }
+    
+    const bonificacionSelectores = [
+      'input[id*="Bonificacion"]',
+      'input[name*="Bonificacion"]',
+      'input[placeholder*="Bonificacion"]',
+      'input[placeholder*="bonificacion"]',
+      'input.numeroConComa'
+    ];
+    
+    for (const selector of bonificacionSelectores) {
+      const elementos = page.locator(selector).filter({ hasNot: page.locator(":disabled") });
+      const count = await elementos.count();
+      
+      if (count > 0) {
+        for (let i = 0; i < count; i++) {
+          const elemento = elementos.nth(i);
+          const isVisible = await elemento.isVisible();
+          const isDisabled = await elemento.isDisabled();
+          
+          if (isVisible && !isDisabled) {
+            await elemento.click();
+            await elemento.fill('');
+            await elemento.fill(valorBonificacion);
+            await page.keyboard.press('Tab');
+            break;
+          }
+         await page.keyboard.press('Tab');
+        }
+      }
+    }
+  }
+
+  // PRODUCTO NUEVO
   if (nuevoProductoUpper === "SI") {
     await page.waitForTimeout(3000);
 
     try {
       await page.getByRole('link', { name: 'Crear Producto/Servicio' }).click();
-      await page.waitForTimeout(2000);
+      await page.waitForTimeout(3000);
       
       await page.waitForSelector('#form-productoModal', { state: 'visible', timeout: 5000 });
       
@@ -216,246 +295,64 @@ async function basic(page, correo, contraseña, cliente, listaPrecio, producto, 
         }
       }
 
-      try {
-        const precioInput = await page.locator('#form-productoModal input#ListaDePreciosList').first();
-        if (await precioInput.count() > 0) {
-          await precioInput.fill(precioNuevoProducto);
-          await page.waitForTimeout(500);
-        } else {
-          const precioAlternativo = await page.locator('#form-productoModal input[type="text"].numeroConComa').first();
-          if (await precioAlternativo.count() > 0) {
-            await precioAlternativo.fill(precioNuevoProducto);
-            await page.waitForTimeout(500);
-          }
-        }
-      } catch (error) {
-        console.log('No se pudo establecer el precio del producto');
-      }
-
+      await page.locator('a').filter({ hasText: 'Peso' }).first().click();
+      await page.waitForTimeout(1000);
+      await page.keyboard.press('Tab');
+      await page.keyboard.type(precioNuevoProducto);
+      await page.keyboard.press('Enter');
       await page.getByRole('link', { name: 'Guardar' }).click();
       await page.waitForTimeout(5000);
       
-      await page.waitForTimeout(3000);
-      
-      if (productoNormalUpper === "SI" && codigoLeido && codigoLeido.trim() !== "") {
+      const seleccioneButtons = await page.locator('a:has-text("Seleccione...")').all();
+      if (seleccioneButtons.length >= 2) {
+        await seleccioneButtons[1].click();
+      } else {
         await page.getByRole("link", { name: "Seleccione... " }).click();
-        await page.waitForTimeout(2000);
-        
-        await page.locator('.select2-input:visible').last().fill(codigoLeido);
-        await page.waitForTimeout(4000);
-        
-        await page.waitForSelector('.select2-results li', { timeout: 10000 });
-        await page.locator('.select2-results li').first().click();
-        await page.waitForTimeout(2000);
-
-        if (cantProducto && cantProducto !== "0") {
-          await page.waitForTimeout(1000);
-          
-          const selectoresCantidad = [
-            'input[placeholder*="Cant"]',
-            'input[placeholder*="cant"]',
-            'input[id*="Cantidad"]',
-            'td input.numeroConComa',
-            'input.numeroConComa'
-          ];
-          
-          let cantidadInput = null;
-          
-          for (const selector of selectoresCantidad) {
-            const elementos = page.locator(selector).filter({ hasNot: page.locator(":disabled") });
-            const count = await elementos.count();
-            if (count > 0) {
-              for (let i = 0; i < count; i++) {
-                const elemento = elementos.nth(i);
-                if (await elemento.isVisible() && !(await elemento.isDisabled())) {
-                  cantidadInput = elemento;
-                  break;
-                }
-              }
-              if (cantidadInput) break;
-            }
-          }
-          
-          if (cantidadInput) {
-            await cantidadInput.click();
-            await cantidadInput.fill('');
-            await cantidadInput.fill(cantProducto || "1");
-          }
-        }
-        
-        if (valorBonificacion && valorBonificacion.trim() !== "") {
-          const bonificacionSelectores = [
-            'input[id*="Bonificacion"]',
-            'input[name*="Bonificacion"]',
-            'input[placeholder*="Bonificacion"]',
-            'input[placeholder*="bonificacion"]',
-            'input.numeroConComa'
-          ];
-          
-          for (const selector of bonificacionSelectores) {
-            const elementos = page.locator(selector).filter({ hasNot: page.locator(":disabled") });
-            const count = await elementos.count();
-            
-            if (count > 0) {
-              for (let i = 0; i < count; i++) {
-                const elemento = elementos.nth(i);
-                const isVisible = await elemento.isVisible();
-                const isDisabled = await elemento.isDisabled();
-                
-                if (isVisible && !isDisabled) {
-                  await elemento.click();
-                  await elemento.fill('');
-                  await elemento.fill(valorBonificacion);
-                  await page.keyboard.press('Tab');
-                  break;
-                }
-              }
-            }
-          }
-        }
       }
+      
+      await page.waitForTimeout(2000);
+      
+      await page.locator('.select2-input:visible').last().fill(codigoLeido);
+      await page.waitForTimeout(4000);
+      
+      await page.waitForSelector('.select2-results li', { timeout: 10000 });
+      await page.locator('.select2-results li').first().click();
+      await page.waitForTimeout(2000);
+
+      await page.keyboard.press('Tab');
+      await page.keyboard.type(cantProductoNuevo);
+      await page.waitForTimeout(1000);
+      await page.keyboard.press('Tab');
+      await page.keyboard.press("Tab");
+      await page.keyboard.type(bonificacionProductoNuevo);
+      await page.waitForTimeout(2000);
+      await page.keyboard.press('Enter');
+      
     } catch (error) {
       console.error('Error al crear nuevo producto:', error);
-    }
-  }
-
-  if (productoNormalUpper === "SI" && producto && producto.trim() !== "" && nuevoProductoUpper !== "SI") {    
-    await page.getByRole("link", { name: "Seleccione... " }).click();
-    await page.waitForTimeout(2000);
-    
-    await page.locator('.select2-input:visible').last().fill(producto);
-    await page.waitForTimeout(4000);
-    
-    await page.waitForSelector('.select2-results li', { timeout: 10000 });
-    await page.locator('.select2-results li').first().click();
-    await page.waitForTimeout(2000);
-
-    if (cantProducto && cantProducto !== "0") {
-      await page.waitForTimeout(1000);
-      
-      const selectoresCantidad = [
-        'input[placeholder*="Cant"]',
-        'input[placeholder*="cant"]',
-        'input[id*="Cantidad"]',
-        'td input.numeroConComa',
-        'input.numeroConComa'
-      ];
-      
-      let cantidadInput = null;
-      
-      for (const selector of selectoresCantidad) {
-        const elementos = page.locator(selector).filter({ hasNot: page.locator(":disabled") });
-        const count = await elementos.count();
-        if (count > 0) {
-          for (let i = 0; i < count; i++) {
-            const elemento = elementos.nth(i);
-            if (await elemento.isVisible() && !(await elemento.isDisabled())) {
-              cantidadInput = elemento;
-              break;
-            }
-          }
-          if (cantidadInput) break;
-        }
-      }
-      
-      if (cantidadInput) {
-        await cantidadInput.click();
-        await cantidadInput.fill('');
-        await cantidadInput.fill(cantProducto);
-      }
-    }
-    
-    const bonificacionSelectores = [
-      'input[id*="Bonificacion"]',
-      'input[name*="Bonificacion"]',
-      'input[placeholder*="Bonificacion"]',
-      'input[placeholder*="bonificacion"]',
-      'input.numeroConComa'
-    ];
-    
-    for (const selector of bonificacionSelectores) {
-      const elementos = page.locator(selector).filter({ hasNot: page.locator(":disabled") });
-      const count = await elementos.count();
-      
-      if (count > 0) {
-        for (let i = 0; i < count; i++) {
-          const elemento = elementos.nth(i);
-          const isVisible = await elemento.isVisible();
-          const isDisabled = await elemento.isDisabled();
-          
-          if (isVisible && !isDisabled) {
-            await elemento.click();
-            await elemento.fill('');
-            await elemento.fill(valorBonificacion);
-            await page.keyboard.press('Tab');
-            break;
-          }
-         await page.keyboard.press('Tab');
-        }
-      }
     }
   }
   
   if (productoLibreUpper === "SI") {
     await page.waitForTimeout(3000);
     
-    try {
-      await page.locator('text="Productos/Servicios Libres"').first().click();
-      await page.waitForTimeout(1000);
-    } catch (error) {
-      console.log('No se pudo hacer clic en Productos/Servicios Libres');
-    }
-    
+    await page.locator(
+    "//input[contains(@id,'ListaProductoLibreVenta') and contains(@id,'__Nombre')]").type(descripcionProductoLibre);
     await page.waitForTimeout(2000);
-    
-    const tableRows = await page.locator('table tr').all();
-    let productoTipoSelect = null;
-    
-    for (let row of tableRows) {
-      const rowText = await row.textContent();
-      if (rowText && rowText.includes('Productos/Servicios Libres')) {
-        const selectElement = await row.locator('select').first();
-        if (await selectElement.count() > 0) {
-          productoTipoSelect = selectElement;
-          break;
-        }
-      }
-    }
-    
-    if (productoTipoSelect) {
-      await productoTipoSelect.selectOption({ label: 'Productos' });
-      await page.waitForTimeout(1000);
-    }
-    
-    const libreRows = await page.locator('table tr').all();
-    let libreRow = null;
-    
-    for (let row of libreRows) {
-      const rowText = await row.textContent();
-      if (rowText && (rowText.includes('Descripción') || rowText.includes('Tipo') || rowText.includes('Cant.'))) {
-        libreRow = row;
-        break;
-      }
-    }
-    
-    if (libreRow) {
-      const inputs = await libreRow.locator('input').all();
-      
-      if (inputs.length >= 4) {
-        await inputs[0].fill(descripcionProductoLibre);
-        await page.waitForTimeout(500);
-        
-        await inputs[1].fill(cantidadProductoLibre);
-        await page.waitForTimeout(500);
-        
-        await inputs[2].fill(precioProductoLibre);
-        await page.waitForTimeout(500);
-        
-        await inputs[3].fill(bonificacionProductoLibre);
-      }
-    }
-    
+    await page.keyboard.press("Tab")
+    await page.keyboard.type(tipoProductoLibre)
+    await page.keyboard.press("Enter")
     await page.waitForTimeout(2000);
+    await page.keyboard.press("Tab")
+    await page.keyboard.type(cantidadProductoLibre)
+    await page.waitForTimeout(2000);
+    await page.keyboard.press("Tab")
+    await page.keyboard.type(precioProductoLibre)
+    await page.waitForTimeout(2000);
+    await page.keyboard.press("Tab")
+    await page.keyboard.type(bonificacionProductoLibre)
+    await page.waitForTimeout(2000);
+    await page.keyboard.press("Enter")
   }
 
   await page.waitForTimeout(5000);
@@ -523,7 +420,7 @@ async function basic(page, correo, contraseña, cliente, listaPrecio, producto, 
     }
   }
   
-  await page.pause();
+  await page.waitForTimeout(5000);
   
   return resultado;
 }
@@ -533,7 +430,7 @@ app.post("/login-basic", async (req, res) => {
           valorBonificacion, porcentajeIVA, nuevoProducto, nombreNuevoProducto, 
           categoriaNuevoProducto, tipoNuevoProducto, ivaNuevoProducto, contableVenta, contableCompra, codigoProveedor, codigoBarra, productoLibre, 
           descripcionProductoLibre, cantidadProductoLibre, precioProductoLibre, 
-          bonificacionProductoLibre, productoNormal, precioNuevoProducto } = req.body;
+          bonificacionProductoLibre, productoNormal, precioNuevoProducto, cantProductoNuevo, tipoProductoLibre, bonificacionProductoNuevo } = req.body;
 
   if (!correo || !contraseña) {
     return res.status(400).json({ 
@@ -584,6 +481,18 @@ app.post("/login-basic", async (req, res) => {
         error: "Cuando nuevoProducto es 'SI', el campo precioNuevoProducto es obligatorio." 
       });
     }
+    if (!cantProductoNuevo) {
+      return res.status(400).json({ 
+        ok: false, 
+        error: "Cuando nuevoProducto es 'SI', el campo cantProductoNuevo es obligatorio." 
+      });
+    }
+     if (!bonificacionProductoNuevo) {
+      return res.status(400).json({ 
+        ok: false, 
+        error: "Cuando nuevoProducto es 'SI', el campo bonificacionProductoNuevo es obligatorio." 
+      });
+    }
   }
   
   if (nuevoProductoUpper !== "SI" && nuevoProductoUpper !== "NO") {
@@ -598,6 +507,12 @@ app.post("/login-basic", async (req, res) => {
       return res.status(400).json({
         ok: false,
         error: "Cuando productoLibre es 'SI', el campo descripcionProductoLibre es obligatorio."
+      });
+    }
+    if (!tipoProductoLibre) {
+      return res.status(400).json({
+        ok: false,
+        error: "Cuando productoLibre es 'SI', el campo tipoProductoLibre es obligatorio."
       });
     }
     if (!cantidadProductoLibre) {
@@ -655,7 +570,7 @@ app.post("/login-basic", async (req, res) => {
               contableVenta || "", contableCompra || "", categoriaNuevoProducto || "", 
               codigoProveedor || '', codigoBarra || '', productoLibreUpper, 
               descripcionProductoLibre || "", cantidadProductoLibre || "", 
-              precioProductoLibre || "", bonificacionProductoLibre || "", productoNormalUpper, precioNuevoProducto || "");
+              precioProductoLibre || "", bonificacionProductoLibre || "", productoNormalUpper, precioNuevoProducto || "", cantProductoNuevo || "", tipoProductoLibre || "", bonificacionProductoNuevo || "");
     res.json({ 
       ok: true, 
       message: "COMPLETADO",
