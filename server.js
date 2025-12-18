@@ -7,7 +7,7 @@ const HEADLESS_MODE = false;
 const app = express();
 app.use(express.json());
 
-async function basic(page, correo, contraseña, cliente, listaPrecio, producto, cantProducto, valorBonificacion, nuevoProductoUpper, nombreNuevoProducto, tipoNuevoProducto, ivaNuevoProducto, contableVenta, contableCompra, categoriaNuevoProducto, codigoProveedor, codigoBarra, productoLibreUpper, descripcionProductoLibre, cantidadProductoLibre, precioProductoLibre, bonificacionProductoLibre, productoNormalUpper, precioNuevoProducto, cantProductoNuevo, tipoProductoLibre, bonificacionProductoNuevo) {
+async function basic(page, correo, contraseña, cliente, listaPrecio, producto, cantProducto, valorBonificacion, nuevoProductoUpper, nombreNuevoProducto, tipoNuevoProducto, ivaNuevoProducto, contableVenta, contableCompra, categoriaNuevoProducto, codigoProveedor, codigoBarra, productoLibreUpper, descripcionProductoLibre, cantidadProductoLibre, precioProductoLibre, bonificacionProductoLibre, productoNormalUpper, precioNuevoProducto, cantProductoNuevo, tipoProductoLibre, bonificacionProductoNuevo, condicionPago, cantidadCuotas) {
   await page.goto("https://dev.fidel.com.ar/");
   await page.getByRole("link", { name: "Iniciar sesión" }).click();
   await page.waitForTimeout(4000);
@@ -47,7 +47,6 @@ async function basic(page, correo, contraseña, cliente, listaPrecio, producto, 
 
   let codigoLeido = "";
 
-  // PRODUCTO NORMAL
   if (productoNormalUpper === "SI" && producto && producto.trim() !== "") {    
     await page.getByRole("link", { name: "Seleccione... " }).click();
     await page.waitForTimeout(2000);
@@ -125,7 +124,6 @@ async function basic(page, correo, contraseña, cliente, listaPrecio, producto, 
     }
   }
 
-  // PRODUCTO NUEVO
   if (nuevoProductoUpper === "SI") {
     await page.waitForTimeout(3000);
 
@@ -400,6 +398,42 @@ async function basic(page, correo, contraseña, cliente, listaPrecio, producto, 
   };
 
   await page.waitForTimeout(5000);
+
+  if (condicionPago && condicionPago.trim() !== "") {
+    const clienteTrim = cliente ? cliente.trim() : "";
+    const condicionPagoLower = condicionPago.toLowerCase().trim();
+    
+    if (clienteTrim === "0000") {
+      if (condicionPagoLower !== "contado") {
+        console.log("Cliente es '0000' - Solo se permite 'Contado' como condición de pago. Se omite el cambio.");
+      } else {
+        console.log("Cliente '0000' con condición 'Contado' - No se requiere cambio");
+      }
+    } else {
+      if (condicionPagoLower === "contado" || condicionPagoLower === "cuenta corriente") {
+        try {
+          await page.locator('a.chosen-single').click();
+          await page.waitForTimeout(2000);
+          
+          const opcionText = condicionPagoLower === "contado" ? "Contado" : "Cuenta corriente";
+          await page.locator(`a:has-text("${opcionText}")`).first().click();
+          await page.waitForTimeout(2000);
+          
+          if (condicionPagoLower === "cuenta corriente" && cantidadCuotas && cantidadCuotas.trim() !== "") {
+            await page.locator('input#CantidadCuotas').click();
+            await page.locator('input#CantidadCuotas').fill(cantidadCuotas);
+            await page.waitForTimeout(2000);
+            await page.keyboard.press('Enter');
+            await page.waitForTimeout(2000);
+          }
+        } catch (error) {
+          console.log('Error al seleccionar condición de pago:', error);
+        }
+      } else {
+        console.log(`Condición de pago '${condicionPago}' no reconocida. Debe ser 'Contado' o 'Cuenta corriente'`);
+      }
+    }
+  }
   
   try {
     await page.locator('a.btn.btn-xs.btn-success:has-text("Facturar")').click();
@@ -430,7 +464,7 @@ app.post("/login-basic", async (req, res) => {
           valorBonificacion, porcentajeIVA, nuevoProducto, nombreNuevoProducto, 
           categoriaNuevoProducto, tipoNuevoProducto, ivaNuevoProducto, contableVenta, contableCompra, codigoProveedor, codigoBarra, productoLibre, 
           descripcionProductoLibre, cantidadProductoLibre, precioProductoLibre, 
-          bonificacionProductoLibre, productoNormal, precioNuevoProducto, cantProductoNuevo, tipoProductoLibre, bonificacionProductoNuevo } = req.body;
+          bonificacionProductoLibre, productoNormal, precioNuevoProducto, cantProductoNuevo, tipoProductoLibre, bonificacionProductoNuevo, condicionPago, cantidadCuotas } = req.body;
 
   if (!correo || !contraseña) {
     return res.status(400).json({ 
@@ -549,6 +583,37 @@ app.post("/login-basic", async (req, res) => {
     });
   }
 
+  if (condicionPago && condicionPago.trim() !== "") {
+    const condicionPagoLower = condicionPago.toLowerCase().trim();
+    const clienteTrim = cliente ? cliente.trim() : "";
+    
+    if (clienteTrim === "0000" && condicionPagoLower !== "contado") {
+      return res.status(400).json({ 
+        ok: false, 
+        error: "Cuando el cliente es '0000', solo se permite 'Contado' como condición de pago." 
+      });
+    }
+    
+    if (condicionPagoLower !== "contado" && condicionPagoLower !== "cuenta corriente") {
+      return res.status(400).json({ 
+        ok: false, 
+        error: "El campo condicionPago debe ser 'Contado' o 'Cuenta Corriente'." 
+      });
+    }
+    
+    if (condicionPagoLower === "cuenta corriente") {
+      if (cantidadCuotas && cantidadCuotas.trim() !== "") {
+        const cuotasNum = parseInt(cantidadCuotas);
+        if (isNaN(cuotasNum) || cuotasNum <= 0) {
+          return res.status(400).json({ 
+            ok: false, 
+            error: "Si se especifica cantidadCuotas, debe ser un número mayor a 0." 
+          });
+        }
+      }
+    }
+  }
+
   const browser = await chromium.launch({ 
     headless: HEADLESS_MODE,
     args: ['--start-maximized']
@@ -570,7 +635,7 @@ app.post("/login-basic", async (req, res) => {
               contableVenta || "", contableCompra || "", categoriaNuevoProducto || "", 
               codigoProveedor || '', codigoBarra || '', productoLibreUpper, 
               descripcionProductoLibre || "", cantidadProductoLibre || "", 
-              precioProductoLibre || "", bonificacionProductoLibre || "", productoNormalUpper, precioNuevoProducto || "", cantProductoNuevo || "", tipoProductoLibre || "", bonificacionProductoNuevo || "");
+              precioProductoLibre || "", bonificacionProductoLibre || "", productoNormalUpper, precioNuevoProducto || "", cantProductoNuevo || "", tipoProductoLibre || "", bonificacionProductoNuevo || "", condicionPago || "", cantidadCuotas || "");
     res.json({ 
       ok: true, 
       message: "COMPLETADO",
