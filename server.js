@@ -412,18 +412,22 @@ async function basic(page, correo, contraseña, cliente, listaPrecio, producto, 
     } else {
       if (condicionPagoLower === "contado" || condicionPagoLower === "cuenta corriente") {
         try {
-          await page.locator('a.chosen-single').click();
+          await page.locator('a')
+              .filter({ hasText: 'Contado' })
+              .or(page.locator('a').filter({ hasText: 'Cuenta corriente' }))
+              .first()
+              .click();            
           await page.waitForTimeout(2000);
-          
-          const opcionText = condicionPagoLower === "contado" ? "Contado" : "Cuenta corriente";
-          await page.locator(`a:has-text("${opcionText}")`).first().click();
+          await page.keyboard.type(condicionPago);
           await page.waitForTimeout(2000);
-          
+          await page.keyboard.press('Enter');
+          await page.waitForTimeout(2000);
+
           if (condicionPagoLower === "cuenta corriente" && cantidadCuotas && cantidadCuotas.trim() !== "") {
             await page.locator('input#CantidadCuotas').click();
-            await page.locator('input#CantidadCuotas').fill(cantidadCuotas);
+            await page.locator('input#CantidadCuotas').type(cantidadCuotas);
             await page.waitForTimeout(2000);
-            await page.keyboard.press('Enter');
+            await page.locator('input#CantidadCuotas').press('Enter');           
             await page.waitForTimeout(2000);
           }
         } catch (error) {
@@ -454,7 +458,28 @@ async function basic(page, correo, contraseña, cliente, listaPrecio, producto, 
     }
   }
   
-  await page.waitForTimeout(5000);
+  await page.waitForTimeout(2000);
+
+  try {
+    const abrirCajaVisible = await page.locator('span#TituloAbrirCaja:has-text("Abrir Caja - General")').isVisible({ timeout: 3000 });
+    
+    if (abrirCajaVisible) {
+      console.log('Se detectó la ventana de "Abrir Caja". Cerrando ventana...');
+      await page.waitForTimeout(2000);
+      
+    try {
+      await page.locator('a[onclick="AbrirCajaPost()"]').click({ force: true });
+      console.log('Botón Guardar de Abrir Caja clickeado');
+    } catch (error) {
+      console.log('No se pudo hacer clic en el botón Guardar de Abrir Caja, presionando Escape...');
+      await page.keyboard.press('Escape');
+    }
+          
+      await page.waitForTimeout(2000);
+    }
+  } catch (error) {
+    
+  }
   
   return resultado;
 }
