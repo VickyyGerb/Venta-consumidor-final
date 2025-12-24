@@ -7,7 +7,7 @@ const HEADLESS_MODE = false;
 const app = express();
 app.use(express.json());
 
-async function basic(page, correo, contraseña, cliente, listaPrecio, productos, cantidades, bonificaciones, valorBonificacion, nuevoProductoUpper, nombreNuevoProducto, tipoNuevoProducto, ivaNuevoProducto, contableVenta, contableCompra, categoriaNuevoProducto, codigoProveedor, codigoBarra, productoLibreUpper, descripcionProductoLibre, cantidadProductoLibre, precioProductoLibre, bonificacionProductoLibre, productoNormalUpper, precioNuevoProducto, cantProductoNuevo, tipoProductoLibre, bonificacionProductoNuevo, condicionPago, cantidadCuotas) {
+async function basic(page, correo, contraseña, cliente, listaPrecio, producto, cantProducto, valorBonificacion, productos, cantidades, bonificaciones, nuevoProductoUpper, nombreNuevoProducto, tipoNuevoProducto, ivaNuevoProducto, contableVenta, contableCompra, categoriaNuevoProducto, codigoProveedor, codigoBarra, productoLibreUpper, descripcionProductoLibre, cantidadProductoLibre, precioProductoLibre, bonificacionProductoLibre, productoNormalUpper, precioNuevoProducto, cantProductoNuevo, tipoProductoLibre, bonificacionProductoNuevo, condicionPago, cantidadCuotas, cantTotalProductos) {
   await page.goto("https://dev.fidel.com.ar/");
   await page.getByRole("link", { name: "Iniciar sesión" }).click();
   await page.waitForTimeout(4000);
@@ -47,55 +47,134 @@ async function basic(page, correo, contraseña, cliente, listaPrecio, productos,
 
   let codigoLeido = "";
 
-  if (productoNormalUpper === "SI" && productos && productos.length > 0) {
-    const productosArray = Array.isArray(productos) ? productos : [productos];
-    const cantidadesArray = Array.isArray(cantidades) ? cantidades : [cantidades];
-    const bonificacionesArray = Array.isArray(bonificaciones) ? bonificaciones : [bonificaciones];
-    
-    const maxLength = Math.max(
-      productosArray.length,
-      cantidadesArray.length,
-      bonificacionesArray.length
-    );
-    
-    for (let i = 0; i < maxLength; i++) {
-      const producto = productosArray[i] || "";
-      const cantidad = cantidadesArray[i] || "1";
-      const bonificacion = bonificacionesArray[i] || "0";
+  if (productoNormalUpper === "SI") {
+    if (cantTotalProductos > 1) {
+      const productosArray = Array.isArray(productos) ? productos : [productos];
+      const cantidadesArray = Array.isArray(cantidades) ? cantidades : [cantidades];
+      const bonificacionesArray = Array.isArray(bonificaciones) ? bonificaciones : [bonificaciones];
       
-      if (producto.trim() === "") {
-        continue;
-      }
+      const maxLength = Math.max(
+        productosArray.length,
+        cantidadesArray.length,
+        bonificacionesArray.length
+      );
       
-      await page.getByRole("link", { name: "Seleccione... " }).click();
-      await page.waitForTimeout(2000);
-      
-      await page.keyboard.type(producto);
-      await page.waitForTimeout(3000);
-      await page.keyboard.press('Enter');
-      await page.waitForTimeout(5000);
-      
-      await page.keyboard.press('Tab');
-      await page.waitForTimeout(500);
-      
-      await page.keyboard.type(cantidad);
-      await page.waitForTimeout(500);
-      
-      await page.keyboard.press('Tab');
-      await page.waitForTimeout(500);
+      for (let i = 0; i < maxLength; i++) {
+        const productoItem = productosArray[i] || "";
+        const cantidad = cantidadesArray[i] || "1";
+        const bonificacion = bonificacionesArray[i] || "0";
+        
+        if (productoItem.trim() === "") {
+          continue;
+        }
+        
+        await page.getByRole("link", { name: "Seleccione... " }).click();
+        await page.waitForTimeout(2000);
+        
+        await page.keyboard.type(productoItem);
+        await page.waitForTimeout(3000);
+        await page.keyboard.press('Enter');
+        await page.waitForTimeout(5000);
+        
+        await page.keyboard.press('Tab');
+        await page.waitForTimeout(500);
+        
+        await page.keyboard.type(cantidad);
+        await page.waitForTimeout(500);
+        
+        await page.keyboard.press('Tab');
+        await page.waitForTimeout(500);
 
-      await page.keyboard.press('Tab');
-      await page.waitForTimeout(500);
-      
-      await page.keyboard.type(bonificacion);
-      await page.waitForTimeout(500);
-      
-      await page.keyboard.press('Enter');
-      await page.waitForTimeout(2000);
-      
-      await page.locator('body').click();
-      await page.keyboard.press('Escape');
-      await page.waitForTimeout(1000);
+        await page.keyboard.press('Tab');
+        await page.waitForTimeout(500);
+        
+        await page.keyboard.type(bonificacion);
+        await page.waitForTimeout(500);
+        
+        await page.keyboard.press('Enter');
+        await page.waitForTimeout(2000);
+        
+        await page.locator('body').click();
+        await page.keyboard.press('Escape');
+        await page.waitForTimeout(1000);
+      }
+    } else {
+      if (producto && producto.trim() !== "") {    
+        await page.getByRole("link", { name: "Seleccione... " }).click();
+        await page.waitForTimeout(2000);
+        
+        await page.locator('.select2-input:visible').last().fill(producto);
+        await page.waitForTimeout(4000);
+        
+        await page.waitForSelector('.select2-results li', { timeout: 10000 });
+        await page.locator('.select2-results li').first().click();
+        await page.waitForTimeout(2000);
+
+        if (cantProducto && cantProducto !== "0") {
+          await page.waitForTimeout(1000);
+          
+          const selectoresCantidad = [
+            'input[placeholder*="Cant"]',
+            'input[placeholder*="cant"]',
+            'input[id*="Cantidad"]',
+            'td input.numeroConComa',
+            'input.numeroConComa'
+          ];
+          
+          let cantidadInput = null;
+          
+          for (const selector of selectoresCantidad) {
+            const elementos = page.locator(selector).filter({ hasNot: page.locator(":disabled") });
+            const count = await elementos.count();
+            if (count > 0) {
+              for (let i = 0; i < count; i++) {
+                const elemento = elementos.nth(i);
+                if (await elemento.isVisible() && !(await elemento.isDisabled())) {
+                  cantidadInput = elemento;
+                  break;
+                }
+              }
+              if (cantidadInput) break;
+            }
+          }
+          
+          if (cantidadInput) {
+            await cantidadInput.click();
+            await cantidadInput.fill('');
+            await cantidadInput.fill(cantProducto);
+          }
+        }
+        
+        const bonificacionSelectores = [
+          'input[id*="Bonificacion"]',
+          'input[name*="Bonificacion"]',
+          'input[placeholder*="Bonificacion"]',
+          'input[placeholder*="bonificacion"]',
+          'input.numeroConComa'
+        ];
+        
+        for (const selector of bonificacionSelectores) {
+          const elementos = page.locator(selector).filter({ hasNot: page.locator(":disabled") });
+          const count = await elementos.count();
+          
+          if (count > 0) {
+            for (let i = 0; i < count; i++) {
+              const elemento = elementos.nth(i);
+              const isVisible = await elemento.isVisible();
+              const isDisabled = await elemento.isDisabled();
+              
+              if (isVisible && !isDisabled) {
+                await elemento.click();
+                await elemento.fill('');
+                await elemento.fill(valorBonificacion);
+                await page.keyboard.press('Tab');
+                break;
+              }
+             await page.keyboard.press('Tab');
+            }
+          }
+        }
+      }
     }
   }
 
@@ -432,8 +511,6 @@ async function basic(page, correo, contraseña, cliente, listaPrecio, productos,
       });
     }
   }
-  
-  await page.waitForTimeout(10000);
 
   try {
     const abrirCajaVisible = await page.locator('span#TituloAbrirCaja:has-text("Abrir Caja - General")').isVisible({ timeout: 3000 });
@@ -455,15 +532,15 @@ async function basic(page, correo, contraseña, cliente, listaPrecio, productos,
   } catch (error) {
     
   }
-  
+  await page.waitForTimeout(10000);
   return resultado;
 
   
 }
 
 app.post("/login-basic", async (req, res) => {
-  const { correo, contraseña, cliente, listaPrecio, productos, cantidades, 
-          bonificaciones, valorBonificacion, porcentajeIVA, nuevoProducto, nombreNuevoProducto, 
+  const { correo, contraseña, cliente, listaPrecio, producto, cantProducto, 
+          valorBonificacion, productos, cantidades, bonificaciones, porcentajeIVA, nuevoProducto, nombreNuevoProducto, 
           categoriaNuevoProducto, tipoNuevoProducto, ivaNuevoProducto, contableVenta, contableCompra, codigoProveedor, codigoBarra, productoLibre, 
           descripcionProductoLibre, cantidadProductoLibre, precioProductoLibre, 
           bonificacionProductoLibre, productoNormal, precioNuevoProducto, cantProductoNuevo, tipoProductoLibre, bonificacionProductoNuevo, condicionPago, cantidadCuotas } = req.body;
@@ -631,13 +708,26 @@ app.post("/login-basic", async (req, res) => {
   page.setDefaultNavigationTimeout(120000);
 
   try {
-    const resultado = await basic(page, correo, contraseña, cliente || "", listaPrecio || "", productos || [], 
-              cantidades || [], bonificaciones || [], valorBonificacion || "", nuevoProductoUpper, 
+    let cantTotalProductos = 0;
+    
+    if (productos && productos.length > 0) {
+      if (Array.isArray(productos)) {
+        cantTotalProductos = productos.length;
+      } else if (typeof productos === 'string' && productos.trim() !== "") {
+        cantTotalProductos = 1;
+      }
+    } else if (producto && producto.trim() !== "") {
+      cantTotalProductos = 1;
+    }
+
+    const resultado = await basic(page, correo, contraseña, cliente || "", listaPrecio || "", producto || "", 
+              cantProducto || "", valorBonificacion || "", productos || [], 
+              cantidades || [], bonificaciones || [], nuevoProductoUpper, 
               nombreNuevoProducto || "", tipoNuevoProducto || "", ivaNuevoProducto || "", 
               contableVenta || "", contableCompra || "", categoriaNuevoProducto || "", 
               codigoProveedor || '', codigoBarra || '', productoLibreUpper, 
               descripcionProductoLibre || "", cantidadProductoLibre || "", 
-              precioProductoLibre || "", bonificacionProductoLibre || "", productoNormalUpper, precioNuevoProducto || "", cantProductoNuevo || "", tipoProductoLibre || "", bonificacionProductoNuevo || "", condicionPago || "", cantidadCuotas || "");
+              precioProductoLibre || "", bonificacionProductoLibre || "", productoNormalUpper, precioNuevoProducto || "", cantProductoNuevo || "", tipoProductoLibre || "", bonificacionProductoNuevo || "", condicionPago || "", cantidadCuotas || "", cantTotalProductos);
     res.json({ 
       ok: true, 
       message: "COMPLETADO",
