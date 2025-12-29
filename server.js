@@ -7,7 +7,7 @@ const HEADLESS_MODE = false;
 const app = express();
 app.use(express.json());
 
-async function basic(page, correo, contraseña, cliente, listaPrecio, producto, cantProducto, valorBonificacion, productos, cantidades, bonificaciones, nuevoProductoUpper, nombreNuevoProducto, tipoNuevoProducto, ivaNuevoProducto, contableVenta, contableCompra, categoriaNuevoProducto, codigoProveedor, codigoBarra, productoLibreUpper, descripcionProductoLibre, cantidadProductoLibre, precioProductoLibre, bonificacionProductoLibre, productoNormalUpper, precioNuevoProducto, cantProductoNuevo, tipoProductoLibre, bonificacionProductoNuevo, condicionPago, cantidadCuotas, cantTotalProductos) {
+async function basic(page, correo, contraseña, cliente, listaPrecio, producto, cantProducto, valorBonificacion, productos, cantidades, bonificaciones, nuevoProductoUpper, nombreNuevoProducto, tipoNuevoProducto, ivaNuevoProducto, contableVenta, contableCompra, categoriaNuevoProducto, codigoProveedor, codigoBarra, productoLibreUpper, descripcionProductoLibre, cantidadProductoLibre, precioProductoLibre, bonificacionProductoLibre, productoNormalUpper, precioNuevoProducto, cantProductoNuevo, tipoProductoLibre, bonificacionProductoNuevo, condicionPago, cantidadCuotas, cantTotalProductos, observacion, pagoTarjeta, tipoTarjeta, numeroTarjeta, montoTarjeta, pagoTransferencia, cuentaTransferencia, montoTransferencia) {
   await page.goto("https://dev.fidel.com.ar/");
   await page.getByRole("link", { name: "Iniciar sesión" }).click();
   await page.waitForTimeout(4000);
@@ -408,6 +408,23 @@ async function basic(page, correo, contraseña, cliente, listaPrecio, producto, 
   }
 
   await page.waitForTimeout(5000);
+
+  if (observacion && observacion.trim() !== "") {
+    try {
+      await page.waitForSelector('#soloObservacion #Observacion', { timeout: 5000 });
+      await page.locator('#soloObservacion #Observacion').click();
+      await page.waitForTimeout(1000);
+      await page.locator('#soloObservacion #Observacion').fill('');
+      await page.waitForTimeout(500);
+      await page.locator('#soloObservacion #Observacion').fill(observacion);
+      await page.waitForTimeout(1000);
+      await page.keyboard.press('Tab');
+      await page.waitForTimeout(1000);
+      console.log(`Observación agregada: ${observacion}`);
+    } catch (error) {
+      console.log('No se pudo agregar la observación, continuando sin ella:', error.message);
+    }
+  }
   
   let precioTotal = await page.evaluate(() => {
     const totalElement = document.querySelector('input#TotalTemp.numeroConComa');
@@ -492,6 +509,82 @@ async function basic(page, correo, contraseña, cliente, listaPrecio, producto, 
       }
     }
   }
+
+  if (condicionPago && condicionPago.toLowerCase().trim() === "contado") {
+    await page.waitForTimeout(3000);
+    
+    if (pagoTarjeta && pagoTarjeta.trim().toUpperCase() === "SI" && tipoTarjeta && montoTarjeta) {
+      try {
+        await page.locator('.hidden-phone.visible-desktop.action-buttons.soloLecturaNoMostrar.noEditableNoMostrar > .green').first().click();
+        await page.waitForTimeout(2000);
+        
+        await page.locator('a').filter({ hasText: 'American Express' }).click();
+        await page.waitForTimeout(1000);
+        
+        await page.keyboard.type(tipoTarjeta);
+        await page.waitForTimeout(2000);
+        await page.keyboard.press('Enter');
+        await page.waitForTimeout(1000);
+        
+        if (numeroTarjeta && numeroTarjeta.trim() !== "") {
+          await page.keyboard.press("Tab");
+          await page.keyboard.type(numeroTarjeta);
+          await page.waitForTimeout(500);
+        }
+        
+        await page.keyboard.press('Tab');
+        await page.keyboard.type(montoTarjeta);
+        await page.keyboard.press('Enter');
+        await page.waitForTimeout(2000);
+        
+        console.log(`Pago con tarjeta agregado: ${tipoTarjeta} - Monto: $${montoTarjeta}`);
+      } catch (error) {
+        console.log('Error al agregar pago con tarjeta:', error.message);
+      }
+    }
+    
+    if (pagoTransferencia && pagoTransferencia.trim().toUpperCase() === "SI" && cuentaTransferencia && montoTransferencia) {
+      try {
+        await page.locator('.col-sm-6.no-padding-left > #noEnter > .header > .hidden-phone > .green').click();
+        await page.waitForTimeout(2000);
+
+        await page.locator('a').filter({ hasText: 'Bancor | 222222 | Factura' }).click();
+        await page.keyboard.type(cuentaTransferencia);
+        await page.waitForTimeout(2000);
+        await page.keyboard.press('Enter');
+        await page.waitForTimeout(1000);
+        
+        await page.keyboard.press('Tab');
+        await page.keyboard.type(montoTransferencia);
+        await page.keyboard.press('Enter');
+        await page.waitForTimeout(2000);
+        
+        console.log(`Pago con transferencia agregado: ${cuentaTransferencia} - Monto: $${montoTransferencia}`);
+      } catch (error) {
+        console.log('Error al agregar pago con transferencia:', error.message);
+      }
+    }
+    
+    if (precioTotal && (montoTarjeta || montoTransferencia)) {
+      try {
+        await page.waitForTimeout(2000);
+        
+        const totalDespuesPagos = await page.evaluate(() => {
+          const totalElement = document.querySelector('input#TotalTemp.numeroConComa');
+          return totalElement ? totalElement.value : null;
+        });
+        
+        console.log(`Total después de agregar pagos: $${totalDespuesPagos}`);
+        
+        const efectivoElement = await page.locator('input#TotalEfectivo.numeroConComa');
+        const efectivoValue = await efectivoElement.inputValue();
+        console.log(`Efectivo ajustado: $${efectivoValue}`);
+        
+      } catch (error) {
+        console.log('Error validando pagos:', error.message);
+      }
+    }
+  }
   
   try {
     await page.locator('a.btn.btn-xs.btn-success:has-text("Facturar")').click();
@@ -543,7 +636,7 @@ app.post("/login-basic", async (req, res) => {
           valorBonificacion, productos, cantidades, bonificaciones, porcentajeIVA, nuevoProducto, nombreNuevoProducto, 
           categoriaNuevoProducto, tipoNuevoProducto, ivaNuevoProducto, contableVenta, contableCompra, codigoProveedor, codigoBarra, productoLibre, 
           descripcionProductoLibre, cantidadProductoLibre, precioProductoLibre, 
-          bonificacionProductoLibre, productoNormal, precioNuevoProducto, cantProductoNuevo, tipoProductoLibre, bonificacionProductoNuevo, condicionPago, cantidadCuotas } = req.body;
+          bonificacionProductoLibre, productoNormal, precioNuevoProducto, cantProductoNuevo, tipoProductoLibre, bonificacionProductoNuevo, condicionPago, cantidadCuotas, observacion, pagoTarjeta, tipoTarjeta, numeroTarjeta, montoTarjeta, pagoTransferencia, cuentaTransferencia, montoTransferencia } = req.body;
 
   if (!correo || !contraseña) {
     return res.status(400).json({ 
@@ -693,6 +786,40 @@ app.post("/login-basic", async (req, res) => {
     }
   }
 
+  if (pagoTarjeta && pagoTarjeta.trim().toUpperCase() === "SI") {
+    if (!tipoTarjeta || !montoTarjeta) {
+      return res.status(400).json({ 
+        ok: false, 
+        error: "Cuando pagoTarjeta es 'SI', los campos tipoTarjeta y montoTarjeta son obligatorios." 
+      });
+    }
+    
+    const montoTarjetaNum = parseFloat(montoTarjeta);
+    if (isNaN(montoTarjetaNum) || montoTarjetaNum <= 0) {
+      return res.status(400).json({ 
+        ok: false, 
+        error: "El campo montoTarjeta debe ser un número mayor a 0." 
+      });
+    }
+  }
+
+  if (pagoTransferencia && pagoTransferencia.trim().toUpperCase() === "SI") {
+    if (!cuentaTransferencia || !montoTransferencia) {
+      return res.status(400).json({ 
+        ok: false, 
+        error: "Cuando pagoTransferencia es 'SI', los campos cuentaTransferencia y montoTransferencia son obligatorios." 
+      });
+    }
+    
+    const montoTransferenciaNum = parseFloat(montoTransferencia);
+    if (isNaN(montoTransferenciaNum) || montoTransferenciaNum <= 0) {
+      return res.status(400).json({ 
+        ok: false, 
+        error: "El campo montoTransferencia debe ser un número mayor a 0." 
+      });
+    }
+  }
+
   const browser = await chromium.launch({ 
     headless: HEADLESS_MODE,
     args: ['--start-maximized']
@@ -727,12 +854,13 @@ app.post("/login-basic", async (req, res) => {
               contableVenta || "", contableCompra || "", categoriaNuevoProducto || "", 
               codigoProveedor || '', codigoBarra || '', productoLibreUpper, 
               descripcionProductoLibre || "", cantidadProductoLibre || "", 
-              precioProductoLibre || "", bonificacionProductoLibre || "", productoNormalUpper, precioNuevoProducto || "", cantProductoNuevo || "", tipoProductoLibre || "", bonificacionProductoNuevo || "", condicionPago || "", cantidadCuotas || "", cantTotalProductos);
+              precioProductoLibre || "", bonificacionProductoLibre || "", productoNormalUpper, precioNuevoProducto || "", cantProductoNuevo || "", tipoProductoLibre || "", bonificacionProductoNuevo || "", condicionPago || "", cantidadCuotas || "", cantTotalProductos, observacion || "", pagoTarjeta || "", tipoTarjeta || "", numeroTarjeta || "", montoTarjeta || "", pagoTransferencia || "", cuentaTransferencia || "", montoTransferencia || "");
     res.json({ 
       ok: true, 
       message: "COMPLETADO",
       precioTotal: resultado.precioTotal,
-      codigoLeido: resultado.codigoLeido
+      codigoLeido: resultado.codigoLeido,
+      observacion: observacion || ""
     });
 
   } catch (error) {
