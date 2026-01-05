@@ -1,4 +1,4 @@
-  import express from "express";
+import express from "express";
   import { chromium } from "playwright";
 
   const PORT = 3000;
@@ -181,230 +181,305 @@
     if (nuevoProductoUpper === "SI") {
       await page.waitForTimeout(3000);
 
-      try {
-        await page.getByRole('link', { name: 'Crear Producto/Servicio' }).click();
-        await page.waitForTimeout(3000);
-        
-        await page.waitForSelector('#form-productoModal', { state: 'visible', timeout: 5000 });
-        
-        codigoLeido = await page.locator('#form-productoModal input#Codigo').inputValue();
-        console.log(`Código leído del formulario: ${codigoLeido}`);
-        
-        await page.locator('#form-productoModal #Nombre').click();
-        await page.locator('#form-productoModal #Nombre').fill(nombreNuevoProducto);
+      const nombresNuevoProductoArray = Array.isArray(nombreNuevoProducto) ? nombreNuevoProducto : [nombreNuevoProducto];
+      const tiposNuevoProductoArray = Array.isArray(tipoNuevoProducto) ? tipoNuevoProducto : [tipoNuevoProducto];
+      const ivasNuevoProductoArray = Array.isArray(ivaNuevoProducto) ? ivaNuevoProducto : [ivaNuevoProducto];
+      const contablesVentaArray = Array.isArray(contableVenta) ? contableVenta : [contableVenta];
+      const contablesCompraArray = Array.isArray(contableCompra) ? contableCompra : [contableCompra];
+      const categoriasNuevoProductoArray = Array.isArray(categoriaNuevoProducto) ? categoriaNuevoProducto : [categoriaNuevoProducto];
+      const codigosProveedorArray = Array.isArray(codigoProveedor) ? codigoProveedor : [codigoProveedor];
+      const codigosBarraArray = Array.isArray(codigoBarra) ? codigoBarra : [codigoBarra];
+      const preciosNuevoProductoArray = Array.isArray(precioNuevoProducto) ? precioNuevoProducto : [precioNuevoProducto];
+      const cantsProductoNuevoArray = Array.isArray(cantProductoNuevo) ? cantProductoNuevo : [cantProductoNuevo];
+      const bonificacionesProductoNuevoArray = Array.isArray(bonificacionProductoNuevo) ? bonificacionProductoNuevo : [bonificacionProductoNuevo];
 
-        await page.waitForTimeout(1000);
+      const maxLengthNuevo = Math.max(
+        nombresNuevoProductoArray.length,
+        tiposNuevoProductoArray.length,
+        ivasNuevoProductoArray.length,
+        contablesVentaArray.length,
+        contablesCompraArray.length,
+        categoriasNuevoProductoArray.length,
+        codigosProveedorArray.length,
+        codigosBarraArray.length,
+        preciosNuevoProductoArray.length,
+        cantsProductoNuevoArray.length,
+        bonificacionesProductoNuevoArray.length
+      );
 
-        if (codigoProveedor && codigoProveedor.trim() !== "") {
-          await page.locator('#form-productoModal #CodigoProveedor').fill(codigoProveedor);
-          await page.waitForTimeout(500);
+      for (let i = 0; i < maxLengthNuevo; i++) {
+        const nombreItem = nombresNuevoProductoArray[i] || "";
+        const tipoItem = tiposNuevoProductoArray[i] || "";
+        const ivaItem = ivasNuevoProductoArray[i] || "";
+        const contableVentaItem = contablesVentaArray[i] || "";
+        const contableCompraItem = contablesCompraArray[i] || "";
+        const categoriaItem = categoriasNuevoProductoArray[i] || "";
+        const codigoProveedorItem = codigosProveedorArray[i] || "";
+        const codigoBarraItem = codigosBarraArray[i] || "";
+        const precioItem = preciosNuevoProductoArray[i] || "";
+        const cantidadItem = cantsProductoNuevoArray[i] || "1";
+        const bonificacionItem = bonificacionesProductoNuevoArray[i] || "0";
+
+        if (nombreItem.trim() === "") {
+          continue;
         }
 
-        if (codigoBarra && codigoBarra.trim() !== "") {
-          await page.locator('#form-productoModal #CodigoDeBarra').fill(codigoBarra);
-          await page.waitForTimeout(500);
-        }
-
-        await page.locator('#ConceptoId_chosen a').click();
-        await page.waitForTimeout(500);
-        
-        await page.locator('#ConceptoId_chosen .chosen-search input').fill(tipoNuevoProducto);
-        await page.waitForTimeout(1000);
-        
-        const tipoOptions = await page.locator('#ConceptoId_chosen .chosen-results li').all();
-        for (const option of tipoOptions) {
-          const optionText = await option.textContent();
-          if (optionText && optionText.includes(tipoNuevoProducto)) {
-            await option.click();
-            break;
-          }
-        }
-        await page.waitForTimeout(1000);
-
-        await page.locator('#AlicuotaId_chosen a').click();
-        await page.waitForTimeout(500);
-        
-        await page.locator('#AlicuotaId_chosen .chosen-search input').fill('');
-        await page.waitForTimeout(500);
-        
-        let ivaEncontrado = false;
-        
-        if (ivaNuevoProducto === "5" || ivaNuevoProducto === "5.0" || ivaNuevoProducto === "5,0") {
-          await page.locator('#AlicuotaId_chosen .chosen-search input').fill('5%');
-          await page.waitForTimeout(2000);
+        try {
+          await page.getByRole('link', { name: 'Crear Producto/Servicio' }).click();
+          await page.waitForTimeout(3000);
           
-          const ivaOptions = await page.locator('#AlicuotaId_chosen .chosen-results li').all();
-          for (const option of ivaOptions) {
+          await page.waitForSelector('#form-productoModal', { state: 'visible', timeout: 5000 });
+          
+          const codigoActual = await page.locator('#form-productoModal input#Codigo').inputValue();
+          console.log(`Código leído del formulario: ${codigoActual}`);
+          codigoLeido = codigoActual;
+          
+          await page.locator('#form-productoModal #Nombre').click();
+          await page.locator('#form-productoModal #Nombre').fill(nombreItem);
+
+          await page.waitForTimeout(1000);
+
+          if (codigoProveedorItem && codigoProveedorItem.trim() !== "") {
+            await page.locator('#form-productoModal #CodigoProveedor').fill(codigoProveedorItem);
+            await page.waitForTimeout(500);
+          }
+
+          if (codigoBarraItem && codigoBarraItem.trim() !== "") {
+            await page.locator('#form-productoModal #CodigoDeBarra').fill(codigoBarraItem);
+            await page.waitForTimeout(500);
+          }
+
+          await page.locator('#ConceptoId_chosen a').click();
+          await page.waitForTimeout(500);
+          
+          await page.locator('#ConceptoId_chosen .chosen-search input').fill(tipoItem);
+          await page.waitForTimeout(1000);
+          
+          const tipoOptions = await page.locator('#ConceptoId_chosen .chosen-results li').all();
+          for (const option of tipoOptions) {
             const optionText = await option.textContent();
-            if (optionText) {
-              const text = optionText.trim();
-              if (text === "5%" || text === "5.00%" || text === "5,00%" || 
-                  text.startsWith("5%") || text.includes("5.00%")) {
+            if (optionText && optionText.includes(tipoItem)) {
+              await option.click();
+              break;
+            }
+          }
+          await page.waitForTimeout(1000);
+
+          await page.locator('#AlicuotaId_chosen a').click();
+          await page.waitForTimeout(500);
+          
+          await page.locator('#AlicuotaId_chosen .chosen-search input').fill('');
+          await page.waitForTimeout(500);
+          
+          let ivaEncontrado = false;
+          
+          if (ivaItem === "5" || ivaItem === "5.0" || ivaItem === "5,0") {
+            await page.locator('#AlicuotaId_chosen .chosen-search input').fill('5%');
+            await page.waitForTimeout(2000);
+            
+            const ivaOptions = await page.locator('#AlicuotaId_chosen .chosen-results li').all();
+            for (const option of ivaOptions) {
+              const optionText = await option.textContent();
+              if (optionText) {
+                const text = optionText.trim();
+                if (text === "5%" || text === "5.00%" || text === "5,00%" || 
+                    text.startsWith("5%") || text.includes("5.00%")) {
+                  await option.click();
+                  ivaEncontrado = true;
+                  break;
+                }
+              }
+            }
+          } 
+          else if (ivaItem === "10.5" || ivaItem === "10,5") {
+            await page.locator('#AlicuotaId_chosen .chosen-search input').fill('10.5%');
+            await page.waitForTimeout(2000);
+            
+            const ivaOptions = await page.locator('#AlicuotaId_chosen .chosen-results li').all();
+            for (const option of ivaOptions) {
+              const optionText = await option.textContent();
+              if (optionText) {
+                const text = optionText.trim();
+                if (text === "10.5%" || text === "10,5%" || text === "10.50%" || text === "10,50%") {
+                  await option.click();
+                  ivaEncontrado = true;
+                  break;
+                }
+              }
+            }
+          }
+          else {
+            await page.locator('#AlicuotaId_chosen .chosen-search input').fill(ivaItem);
+            await page.waitForTimeout(2000);
+            
+            const ivaOptions = await page.locator('#AlicuotaId_chosen .chosen-results li').all();
+            for (const option of ivaOptions) {
+              const optionText = await option.textContent();
+              if (optionText && optionText.includes(ivaItem)) {
                 await option.click();
                 ivaEncontrado = true;
                 break;
               }
             }
           }
-        } 
-        else if (ivaNuevoProducto === "10.5" || ivaNuevoProducto === "10,5") {
-          await page.locator('#AlicuotaId_chosen .chosen-search input').fill('10.5%');
-          await page.waitForTimeout(2000);
           
-          const ivaOptions = await page.locator('#AlicuotaId_chosen .chosen-results li').all();
-          for (const option of ivaOptions) {
-            const optionText = await option.textContent();
-            if (optionText) {
-              const text = optionText.trim();
-              if (text === "10.5%" || text === "10,5%" || text === "10.50%" || text === "10,50%") {
-                await option.click();
-                ivaEncontrado = true;
-                break;
-              }
-            }
+          if (!ivaEncontrado) {
+            await page.locator('#AlicuotaId_chosen .chosen-results li').first().click();
           }
-        }
-        else {
-          await page.locator('#AlicuotaId_chosen .chosen-search input').fill(ivaNuevoProducto);
-          await page.waitForTimeout(2000);
           
-          const ivaOptions = await page.locator('#AlicuotaId_chosen .chosen-results li').all();
-          for (const option of ivaOptions) {
-            const optionText = await option.textContent();
-            if (optionText && optionText.includes(ivaNuevoProducto)) {
-              await option.click();
-              ivaEncontrado = true;
-              break;
-            }
-          }
-        }
-        
-        if (!ivaEncontrado) {
-          await page.locator('#AlicuotaId_chosen .chosen-results li').first().click();
-        }
-        
-        await page.waitForTimeout(1000);
+          await page.waitForTimeout(1000);
 
-        await page.locator('#divSubCategorias a').click();
-        await page.waitForTimeout(500);
-        
-        await page.locator('#divSubCategorias .chosen-search input').fill(categoriaNuevoProducto);
-        await page.waitForTimeout(2000);
-        
-        const categoriaOptions = await page.locator('#divSubCategorias .chosen-results li').all();
-        let categoriaEncontrada = false;
-        
-        for (const option of categoriaOptions) {
-          const optionText = await option.textContent();
-          if (optionText) {
-            const text = optionText.trim();
-            if (text.toLowerCase() === categoriaNuevoProducto.toLowerCase()) {
-              await option.click();
-              categoriaEncontrada = true;
-              break;
-            }
-          }
-        }
-        
-        if (!categoriaEncontrada) {
+          await page.locator('#divSubCategorias a').click();
+          await page.waitForTimeout(500);
+          
+          await page.locator('#divSubCategorias .chosen-search input').fill(categoriaItem);
+          await page.waitForTimeout(2000);
+          
+          const categoriaOptions = await page.locator('#divSubCategorias .chosen-results li').all();
+          let categoriaEncontrada = false;
+          
           for (const option of categoriaOptions) {
             const optionText = await option.textContent();
-            if (optionText && optionText.toLowerCase().includes(categoriaNuevoProducto.toLowerCase())) {
-              await option.click();
-              categoriaEncontrada = true;
-              break;
+            if (optionText) {
+              const text = optionText.trim();
+              if (text.toLowerCase() === categoriaItem.toLowerCase()) {
+                await option.click();
+                categoriaEncontrada = true;
+                break;
+              }
             }
           }
-        }
-        
-        if (!categoriaEncontrada && categoriaOptions.length > 0) {
-          await categoriaOptions[0].click();
-        }
-        
-        await page.waitForTimeout(1000);
-
-        if (contableVenta && contableVenta.trim() !== "") {
-          try {
-            const contableVentaInput = await page.locator('#form-productoModal input[name*="ContableVenta"], #form-productoModal input[id*="ContableVenta"]').first();
-            if (await contableVentaInput.count() > 0) {
-              await contableVentaInput.fill(contableVenta);
-              await page.waitForTimeout(500);
+          
+          if (!categoriaEncontrada) {
+            for (const option of categoriaOptions) {
+              const optionText = await option.textContent();
+              if (optionText && optionText.toLowerCase().includes(categoriaItem.toLowerCase())) {
+                await option.click();
+                categoriaEncontrada = true;
+                break;
+              }
             }
-          } catch (error) {
-            console.log('No se encontró campo contableVenta');
           }
-        }
+          
+          if (!categoriaEncontrada && categoriaOptions.length > 0) {
+            await categoriaOptions[0].click();
+          }
+          
+          await page.waitForTimeout(1000);
 
-        if (contableCompra && contableCompra.trim() !== "") {
-          try {
-            const contableCompraInput = await page.locator('#form-productoModal input[name*="ContableCompra"], #form-productoModal input[id*="ContableCompra"]').first();
-            if (await contableCompraInput.count() > 0) {
-              await contableCompraInput.fill(contableCompra);
-              await page.waitForTimeout(500);
+          if (contableVentaItem && contableVentaItem.trim() !== "") {
+            try {
+              const contableVentaInput = await page.locator('#form-productoModal input[name*="ContableVenta"], #form-productoModal input[id*="ContableVenta"]').first();
+              if (await contableVentaInput.count() > 0) {
+                await contableVentaInput.fill(contableVentaItem);
+                await page.waitForTimeout(500);
+              }
+            } catch (error) {
+              console.log('No se encontró campo contableVenta');
             }
-          } catch (error) {
-            console.log('No se encontró campo contableCompra');
           }
-        }
 
-        await page.locator('a').filter({ hasText: 'Peso' }).first().click();
-        await page.waitForTimeout(1000);
-        await page.keyboard.press('Tab');
-        await page.keyboard.type(precioNuevoProducto);
-        await page.keyboard.press('Enter');
-        await page.getByRole('link', { name: 'Guardar' }).click();
-        await page.waitForTimeout(5000);
-        
-        const seleccioneButtons = await page.locator('a:has-text("Seleccione...")').all();
-        if (seleccioneButtons.length >= 2) {
-          await seleccioneButtons[1].click();
-        } else {
-          await page.getByRole("link", { name: "Seleccione... " }).click();
-        }
-        
-        await page.waitForTimeout(2000);
-        
-        await page.locator('.select2-input:visible').last().fill(codigoLeido);
-        await page.waitForTimeout(4000);
-        
-        await page.waitForSelector('.select2-results li', { timeout: 10000 });
-        await page.locator('.select2-results li').first().click();
-        await page.waitForTimeout(2000);
+          if (contableCompraItem && contableCompraItem.trim() !== "") {
+            try {
+              const contableCompraInput = await page.locator('#form-productoModal input[name*="ContableCompra"], #form-productoModal input[id*="ContableCompra"]').first();
+              if (await contableCompraInput.count() > 0) {
+                await contableCompraInput.fill(contableCompraItem);
+                await page.waitForTimeout(500);
+              }
+            } catch (error) {
+              console.log('No se encontró campo contableCompra');
+            }
+          }
 
-        await page.keyboard.press('Tab');
-        await page.keyboard.type(cantProductoNuevo);
-        await page.waitForTimeout(1000);
-        await page.keyboard.press('Tab');
-        await page.keyboard.press("Tab");
-        await page.keyboard.type(bonificacionProductoNuevo);
-        await page.waitForTimeout(2000);
-        await page.keyboard.press('Enter');
-        
-      } catch (error) {
-        console.error('Error al crear nuevo producto:', error);
+          await page.locator('a').filter({ hasText: 'Peso' }).first().click();
+          await page.waitForTimeout(1000);
+          await page.keyboard.press('Tab');
+          await page.keyboard.type(precioItem);
+          await page.keyboard.press('Enter');
+          await page.getByRole('link', { name: 'Guardar' }).click();
+          await page.waitForTimeout(5000);
+          
+          const seleccioneButtons = await page.locator('a:has-text("Seleccione...")').all();
+          if (seleccioneButtons.length >= 2) {
+            await seleccioneButtons[1].click();
+          } else {
+            await page.getByRole("link", { name: "Seleccione... " }).click();
+          }
+          
+          await page.waitForTimeout(2000);
+          
+          await page.locator('.select2-input:visible').last().fill(codigoActual);
+          await page.waitForTimeout(4000);
+          
+          await page.waitForSelector('.select2-results li', { timeout: 10000 });
+          await page.locator('.select2-results li').first().click();
+          await page.waitForTimeout(2000);
+
+          await page.keyboard.press('Tab');
+          await page.keyboard.type(cantidadItem);
+          await page.waitForTimeout(1000);
+          await page.keyboard.press('Tab');
+          await page.keyboard.press("Tab");
+          await page.keyboard.type(bonificacionItem);
+          await page.waitForTimeout(2000);
+          await page.keyboard.press('Enter');
+          
+        } catch (error) {
+          console.error('Error al crear nuevo producto:', error);
+        }
       }
     }
     
     if (productoLibreUpper === "SI") {
       await page.waitForTimeout(3000);
-      
-      await page.locator(
-      "//input[contains(@id,'ListaProductoLibreVenta') and contains(@id,'__Nombre')]").type(descripcionProductoLibre);
-      await page.waitForTimeout(2000);
-      await page.keyboard.press("Tab")
-      await page.keyboard.type(tipoProductoLibre)
-      await page.keyboard.press("Enter")
-      await page.waitForTimeout(2000);
-      await page.keyboard.press("Tab")
-      await page.keyboard.type(cantidadProductoLibre)
-      await page.waitForTimeout(2000);
-      await page.keyboard.press("Tab")
-      await page.keyboard.type(precioProductoLibre)
-      await page.waitForTimeout(2000);
-      await page.keyboard.press("Tab")
-      await page.keyboard.type(bonificacionProductoLibre)
-      await page.waitForTimeout(2000);
-      await page.keyboard.press("Enter")
+
+      const descripcionesProductoLibreArray = Array.isArray(descripcionProductoLibre) ? descripcionProductoLibre : [descripcionProductoLibre];
+      const tiposProductoLibreArray = Array.isArray(tipoProductoLibre) ? tipoProductoLibre : [tipoProductoLibre];
+      const cantidadesProductoLibreArray = Array.isArray(cantidadProductoLibre) ? cantidadProductoLibre : [cantidadProductoLibre];
+      const preciosProductoLibreArray = Array.isArray(precioProductoLibre) ? precioProductoLibre : [precioProductoLibre];
+      const bonificacionesProductoLibreArray = Array.isArray(bonificacionProductoLibre) ? bonificacionProductoLibre : [bonificacionProductoLibre];
+
+      const maxLengthLibre = Math.max(
+        descripcionesProductoLibreArray.length,
+        tiposProductoLibreArray.length,
+        cantidadesProductoLibreArray.length,
+        preciosProductoLibreArray.length,
+        bonificacionesProductoLibreArray.length
+      );
+
+      for (let i = 0; i < maxLengthLibre; i++) {
+        const descripcionItem = descripcionesProductoLibreArray[i] || "";
+        const tipoItem = tiposProductoLibreArray[i] || "";
+        const cantidadItem = cantidadesProductoLibreArray[i] || "1";
+        const precioItem = preciosProductoLibreArray[i] || "";
+        const bonificacionItem = bonificacionesProductoLibreArray[i] || "0";
+
+        if (descripcionItem.trim() === "") {
+          continue;
+        }
+
+        if (i > 0) {
+          await page.locator('#tituloProductosLibres').getByRole('link').filter({ hasText: /^$/ }).click();
+          await page.waitForTimeout(2000);
+        }
+        await page.waitForTimeout(2000);
+        await page.locator("//input[contains(@id,'ListaProductoLibreVenta') and contains(@id,'__Nombre')]").last().type(descripcionItem);
+        await page.keyboard.press("Tab")
+        await page.keyboard.type(tipoItem)
+        await page.keyboard.press("Enter")
+        await page.waitForTimeout(2000);
+        await page.keyboard.press("Tab")
+        await page.keyboard.type(cantidadItem)
+        await page.waitForTimeout(2000);
+        await page.keyboard.press("Tab")
+        await page.keyboard.type(precioItem)
+        await page.waitForTimeout(2000);
+        await page.keyboard.press("Tab")
+        await page.keyboard.type(bonificacionItem)
+        await page.waitForTimeout(2000);
+        await page.keyboard.press("Enter")
+        await page.waitForTimeout(2000);
+      }
     }
 
     await page.waitForTimeout(5000);
@@ -718,54 +793,66 @@
     const productoNormalUpper = productoNormal ? productoNormal.trim().toUpperCase() : "SI";
 
     if (nuevoProductoUpper === "SI") {
-      if (!nombreNuevoProducto) {
-        return res.status(400).json({ 
-          ok: false, 
-          error: "Cuando nuevoProducto es 'SI', el campo nombreNuevoProducto es obligatorio." 
-        });
-      }
-      
-      if (!categoriaNuevoProducto) {
-        return res.status(400).json({ 
-          ok: false, 
-          error: "Cuando nuevoProducto es 'SI', el campo categoriaNuevoProducto es obligatorio." 
-        });
-      }
-      if (!ivaNuevoProducto) {
-        return res.status(400).json({ 
-          ok: false, 
-          error: "Cuando nuevoProducto es 'SI', el campo ivaNuevoProducto es obligatorio." 
-        });
-      }
-      if (!contableCompra) {
-        return res.status(400).json({ 
-          ok: false, 
-          error: "Cuando nuevoProducto es 'SI', el campo contableCompra es obligatorio." 
-        });
-      }
-      if (!contableVenta) {
-        return res.status(400).json({ 
-          ok: false, 
-          error: "Cuando nuevoProducto es 'SI', el campo contableVenta es obligatorio." 
-        });
-      }
-      if (!precioNuevoProducto) {
-        return res.status(400).json({ 
-          ok: false, 
-          error: "Cuando nuevoProducto es 'SI', el campo precioNuevoProducto es obligatorio." 
-        });
-      }
-      if (!cantProductoNuevo) {
-        return res.status(400).json({ 
-          ok: false, 
-          error: "Cuando nuevoProducto es 'SI', el campo cantProductoNuevo es obligatorio." 
-        });
-      }
-      if (!bonificacionProductoNuevo) {
-        return res.status(400).json({ 
-          ok: false, 
-          error: "Cuando nuevoProducto es 'SI', el campo bonificacionProductoNuevo es obligatorio." 
-        });
+      const nombresNuevoProductoArray = Array.isArray(nombreNuevoProducto) ? nombreNuevoProducto : [nombreNuevoProducto];
+      const tiposNuevoProductoArray = Array.isArray(tipoNuevoProducto) ? tipoNuevoProducto : [tipoNuevoProducto];
+      const ivasNuevoProductoArray = Array.isArray(ivaNuevoProducto) ? ivaNuevoProducto : [ivaNuevoProducto];
+      const contablesVentaArray = Array.isArray(contableVenta) ? contableVenta : [contableVenta];
+      const contablesCompraArray = Array.isArray(contableCompra) ? contableCompra : [contableCompra];
+      const categoriasNuevoProductoArray = Array.isArray(categoriaNuevoProducto) ? categoriaNuevoProducto : [categoriaNuevoProducto];
+      const preciosNuevoProductoArray = Array.isArray(precioNuevoProducto) ? precioNuevoProducto : [precioNuevoProducto];
+      const cantsProductoNuevoArray = Array.isArray(cantProductoNuevo) ? cantProductoNuevo : [cantProductoNuevo];
+      const bonificacionesProductoNuevoArray = Array.isArray(bonificacionProductoNuevo) ? bonificacionProductoNuevo : [bonificacionProductoNuevo];
+
+      for (let i = 0; i < nombresNuevoProductoArray.length; i++) {
+        if (!nombresNuevoProductoArray[i]) {
+          return res.status(400).json({ 
+            ok: false, 
+            error: "Cuando nuevoProducto es 'SI', todos los elementos de nombreNuevoProducto son obligatorios." 
+          });
+        }
+        
+        if (!categoriasNuevoProductoArray[i]) {
+          return res.status(400).json({ 
+            ok: false, 
+            error: "Cuando nuevoProducto es 'SI', todos los elementos de categoriaNuevoProducto son obligatorios." 
+          });
+        }
+        if (!ivasNuevoProductoArray[i]) {
+          return res.status(400).json({ 
+            ok: false, 
+            error: "Cuando nuevoProducto es 'SI', todos los elementos de ivaNuevoProducto son obligatorios." 
+          });
+        }
+        if (!contablesCompraArray[i]) {
+          return res.status(400).json({ 
+            ok: false, 
+            error: "Cuando nuevoProducto es 'SI', todos los elementos de contableCompra son obligatorios." 
+          });
+        }
+        if (!contablesVentaArray[i]) {
+          return res.status(400).json({ 
+            ok: false, 
+            error: "Cuando nuevoProducto es 'SI', todos los elementos de contableVenta son obligatorios." 
+          });
+        }
+        if (!preciosNuevoProductoArray[i]) {
+          return res.status(400).json({ 
+            ok: false, 
+            error: "Cuando nuevoProducto es 'SI', todos los elementos de precioNuevoProducto son obligatorios." 
+          });
+        }
+        if (!cantsProductoNuevoArray[i]) {
+          return res.status(400).json({ 
+            ok: false, 
+            error: "Cuando nuevoProducto es 'SI', todos los elementos de cantProductoNuevo son obligatorios." 
+          });
+        }
+        if (!bonificacionesProductoNuevoArray[i]) {
+          return res.status(400).json({ 
+            ok: false, 
+            error: "Cuando nuevoProducto es 'SI', todos los elementos de bonificacionProductoNuevo son obligatorios." 
+          });
+        }
       }
     }
     
@@ -777,35 +864,43 @@
     }
 
     if (productoLibreUpper === "SI") {
-      if (!descripcionProductoLibre) {
-        return res.status(400).json({
-          ok: false,
-          error: "Cuando productoLibre es 'SI', el campo descripcionProductoLibre es obligatorio."
-        });
-      }
-      if (!tipoProductoLibre) {
-        return res.status(400).json({
-          ok: false,
-          error: "Cuando productoLibre es 'SI', el campo tipoProductoLibre es obligatorio."
-        });
-      }
-      if (!cantidadProductoLibre) {
-        return res.status(400).json({
-          ok: false,  
-          error: "Cuando productoLibre es 'SI', el campo cantidadProductoLibre es obligatorio."
-        });
-      }
-      if (!precioProductoLibre) {
-        return res.status(400).json({
-          ok: false,
-          error: "Cuando productoLibre es 'SI', el campo precioProductoLibre es obligatorio."
-        });
-      }
-      if (!bonificacionProductoLibre) {
-        return res.status(400).json({
-          ok: false,
-          error: "Cuando productoLibre es 'SI', el campo bonificacionProductoLibre es obligatorio."
-        });
+      const descripcionesProductoLibreArray = Array.isArray(descripcionProductoLibre) ? descripcionProductoLibre : [descripcionProductoLibre];
+      const tiposProductoLibreArray = Array.isArray(tipoProductoLibre) ? tipoProductoLibre : [tipoProductoLibre];
+      const cantidadesProductoLibreArray = Array.isArray(cantidadProductoLibre) ? cantidadProductoLibre : [cantidadProductoLibre];
+      const preciosProductoLibreArray = Array.isArray(precioProductoLibre) ? precioProductoLibre : [precioProductoLibre];
+      const bonificacionesProductoLibreArray = Array.isArray(bonificacionProductoLibre) ? bonificacionProductoLibre : [bonificacionProductoLibre];
+
+      for (let i = 0; i < descripcionesProductoLibreArray.length; i++) {
+        if (!descripcionesProductoLibreArray[i]) {
+          return res.status(400).json({
+            ok: false,
+            error: "Cuando productoLibre es 'SI', todos los elementos de descripcionProductoLibre son obligatorios."
+          });
+        }
+        if (!tiposProductoLibreArray[i]) {
+          return res.status(400).json({
+            ok: false,
+            error: "Cuando productoLibre es 'SI', todos los elementos de tipoProductoLibre son obligatorios."
+          });
+        }
+        if (!cantidadesProductoLibreArray[i]) {
+          return res.status(400).json({
+            ok: false,  
+            error: "Cuando productoLibre es 'SI', todos los elementos de cantidadProductoLibre son obligatorios."
+          });
+        }
+        if (!preciosProductoLibreArray[i]) {
+          return res.status(400).json({
+            ok: false,
+            error: "Cuando productoLibre es 'SI', todos los elementos de precioProductoLibre son obligatorios."
+          });
+        }
+        if (!bonificacionesProductoLibreArray[i]) {
+          return res.status(400).json({
+            ok: false,
+            error: "Cuando productoLibre es 'SI', todos los elementos de bonificacionProductoLibre son obligatorios."
+          });
+        }
       }
     }
 
